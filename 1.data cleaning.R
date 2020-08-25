@@ -29,9 +29,13 @@ Medication_v2 <-
 Radiation_v2 <- 
   read_csv(paste0(path, "/Garrick/10R20000134_2020-05-05_avatar_v2_clinical-with-events/Radiation.csv"))
 Metastasis_v2 <- 
-  read_csv(paste0(path, "/Garrick/10R20000134_2020-05-05_avatar_v2_clinical-with-events/DiagnosisMetastaticDisease.csv"))
+  read_csv(paste0(path, "/Garrick/10R20000134_2020-05-05_avatar_v2_clinical-with-events/DiagnosisMetastaticDisease.csv")) %>% 
+  select("AvatarKey", MetastaticDiseaseInd = "MetastaticDisease", 
+         "MetastaticDiseaseSite", "MetastaticDiseaseSiteCode")
 Metastasis_v2_f <- 
-  read_csv(paste0(path, "/Garrick/10R20000134_2020-05-05_avatar_v2_clinical-with-events/FollowUpDiagnosisMetastaticDisease.csv"))
+  read_csv(paste0(path, "/Garrick/10R20000134_2020-05-05_avatar_v2_clinical-with-events/FollowUpDiagnosisMetastaticDisease.csv")) %>% 
+  select("AvatarKey", MetastaticDiseaseInd = "MetastaticDisease", 
+         "MetastaticDiseaseSite", "MetastaticDiseaseSiteCode")
 Staging_v2 <- 
   read_csv(paste0(path, "/Garrick/10R20000134_2020-05-05_avatar_v2_clinical-with-events/DiagnosisStaging.csv"))
 Staging_v2_f <- 
@@ -46,7 +50,9 @@ Medication_v4 <-
 Radiation_v4 <- 
   read_csv(paste0(path, "/Garrick/10R20000134_2020-05-05_avatar_v4_clinical-with-events/Radiation.csv"))
 Metastasis_v4 <- 
-  read_csv(paste0(path, "/Garrick/10R20000134_2020-05-05_avatar_v4_clinical-with-events/MetastaticDisease.csv"))
+  read_csv(paste0(path, "/Garrick/10R20000134_2020-05-05_avatar_v4_clinical-with-events/MetastaticDisease.csv")) %>% 
+  select("AvatarKey", "MetastaticDiseaseInd", 
+         "MetastaticDiseaseSite", "MetastaticDiseaseSiteCode")
 
 ####################################################################################################### II ### Data cleaning----
 # Demographics
@@ -119,18 +125,48 @@ Radiation <- dcast(setDT(Radiation), AvatarKey ~ rowid(AvatarKey),
 write_csv(Radiation, paste0(path, "/output data/cleaned files/Radiation.csv"))
 
 # Metastasis----
-
-
-
-
-
-
-
-
-
-
+# remove the ID with follow up from the base file
+# So take Yes, No, Unknown independently 
+# remove the ID of Yes from No then Yes+No from Unknown
+Metastasis <- bind_rows(Metastasis_v2, Metastasis_v2_f, Metastasis_v4, .id = "versionMets")
+metastasis_Yes <- Metastasis %>% 
+  filter(str_detect(MetastaticDiseaseInd, "Yes"))
+uid <- paste(unique(metastasis_Yes$AvatarKey), collapse = "|")
+Metastasis_No <- Metastasis %>% 
+  filter(str_detect(MetastaticDiseaseInd, "No"))
+Metastasis_No <- Metastasis_No[(!grepl(uid, Metastasis_No$AvatarKey)),]
+metastasis <- bind_rows(metastasis_Yes, Metastasis_No)
+uid <- paste(unique(metastasis$AvatarKey), collapse = "|")
+Metastasis_Unknown <- Metastasis %>% 
+  filter(str_detect(MetastaticDiseaseInd, "Unknown"))
+Metastasis_Unknown <- Metastasis_Unknown[(!grepl(uid, Metastasis_Unknown$AvatarKey)),]
+metastasis <- bind_rows(metastasis, Metastasis_Unknown) %>% 
+  distinct(.)
+Metastasis <- dcast(setDT(metastasis), AvatarKey ~ rowid(AvatarKey),
+                   value.var = c("MetastaticDiseaseInd", 
+                                 "MetastaticDiseaseSite", "MetastaticDiseaseSiteCode")) 
+write_csv(Metastasis, paste0(path, "/output data/cleaned files/Metastasis.csv"))
 
 # Cleaning
-rm(Medication_v2, Medication_v4, Radiation_v2, Radiation_v4)
+rm(Medication_v2, Medication_v4, Radiation_v2, Radiation_v4, Metastasis_No,
+   Metastasis_Unknown, Metastasis_v2, Metastasis_v2_f, Metastasis_v4, metastasis_Yes)
+
+# Staging----
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # End
