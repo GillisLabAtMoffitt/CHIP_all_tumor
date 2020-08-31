@@ -56,7 +56,11 @@ Metastasis_v4 <-
 
 ####################################################################################################### II ### Data cleaning----
 # Demographics
-Demographics <- bind_rows(Demo_v2, Demo_v4) # has no duplicate
+Demographics <- bind_rows(Demo_v2, Demo_v4) %>%  # has no duplicate
+  mutate(AgeAtFirstContact = case_when(
+    AgeAtFirstContact == "Age 90 or Older" ~ 90,
+    TRUE ~ as.numeric(AgeAtFirstContact)
+  ))
 
 # Vitals
 Vitals_v2$AvatarKey[which(duplicated(Vitals_v2$AvatarKey))]
