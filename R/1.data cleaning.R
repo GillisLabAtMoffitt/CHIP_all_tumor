@@ -18,7 +18,7 @@ path <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", "
 # ), pattern = "*.csv", full.names = TRUE)
 # 
 # clinical_v4 <- lapply(myfiles, read_csv)
-# V2
+# V2----
 Demo_v2 <- read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/Demographics.csv"))
 Vitals_v2 <- 
   read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/DemographicsVitalStatusLastContact.csv"))
@@ -46,8 +46,11 @@ Surgery_v2 <-
 TMarkers_v2 <- 
   read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/TumorMarkers.csv"),
            col_types = cols(AgeAtTumorMarkerTestFlag = col_character()))
+Sequencing_v2 <- 
+  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/ClinicalSpecimen.csv")) %>% 
+  select("AvatarKey", "ORIENSpecimenID", "WES", "AgeAtSpecimenCollection", "Tumor/Germline")
 
-# V4
+# V4----
 Demo_v4 <- read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/PatientMaster.csv"))
 Vitals_v4 <-
   read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/VitalStatus.csv"))
@@ -65,6 +68,10 @@ Surgery_v4 <-
   read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/SurgeryBiopsy.csv"))
 TMarkers_v4 <- 
   read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/TumorMarker.csv"))
+Sequencing_v4 <- 
+  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/ClinicalSpecimen.csv")) %>% 
+  select("AvatarKey", "ORIENSpecimenID", "WES", "AgeAtSpecimenCollection", "Tumor/Germline")
+
 
 ####################################################################################################### II ### Data cleaning----
 # Demographics
@@ -188,7 +195,7 @@ Staging <- dcast(setDT(staging), AvatarKey ~ rowid(AvatarKey),
                     value.var = c("PrimaryDiagnosisSiteCode", "PrimaryDiagnosisSite", "AgeAtDiagnosis",
                                   "DiagnosedLastSixMonths", "Histology", "HistologyCode", "ClinTStage", 
                                   "ClinNStage", "ClinMStage", "TNMEditionNumber", "OtherStagingSystem", 
-                                  "OtherStagingGradeValue","staging_dome")) 
+                                  "OtherStagingGradeValue","staging_done")) 
 
 # write_csv(Staging, paste0(path, "/output data/cleaned files/Staging.csv"))
 
@@ -234,18 +241,31 @@ TMarkers <- dcast(setDT(tmarkers), AvatarKey ~ rowid(AvatarKey),
                                "TMarkerPercentStainResultValue", "TumorMarkerInd", "TumorMarkerKey")) 
 # write_csv(TMarkers, paste0(path, "/output data/cleaned files/Tumor markers.csv"))
 
+# Sequencing----
+Sequencing_v2 <- Sequencing_v2 %>% filter(`Tumor/Germline`== "Germline")
+Sequencing_v4 <- Sequencing_v4 %>% filter(`Tumor/Germline`== "Germline")
+
+Sequencing <- bind_rows(Sequencing_v2, Sequencing_v4) %>% 
+  unique()
+Sequencing[duplicated(Sequencing$AvatarKey),] %>% arrange(AvatarKey)
+
 
 
 # Cleaning
-rm(Demo_v2, Demo_v4,
-  Medication_v2, Medication_v4, Radiation_v2, Radiation_v4, Metastasis_No,
-   Metastasis_Unknown, Metastasis_v2, Metastasis_v2_f, Metastasis_v4, metastasis_Yes)
+rm(Demo_v2, Demo_v4, Vitals_v2, Vitals_v2a, Vitals_v4,
+   Medication_v2, Medication_v4, Radiation_v2, Radiation_v4, Metastasis_No,
+   Metastasis_Unknown, Metastasis_v2, Metastasis_v2_f, Metastasis_v4, metastasis_Yes,
+   Staging_v2, Staging_v2_f, Staging_v4, Surgery_v2, Surgery_v4, TMarkers_v2, TMarkers_v4, 
+   Sequencing_v2, Sequencing_v4, uid)
+####################################################################################################### III ### Merging----
 
-# Staging----
-
-
-
-
+Global_data <- full_join(Sequencing, Demographics, by= "AvatarKey") %>% # Vitals
+  full_join(., Staging, by= "AvatarKey") %>% 
+  full_join(., Medication, by= "AvatarKey") %>% 
+  full_join(., Radiation, by= "AvatarKey") %>% 
+  full_join(., Surgery, by= "AvatarKey") %>% 
+  full_join(., Metastasis, by= "AvatarKey") %>% 
+  full_join(., TMarkers, by= "AvatarKey") # %>% SCT
 
 
 
