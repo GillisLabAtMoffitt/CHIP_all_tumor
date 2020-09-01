@@ -3,6 +3,7 @@
 .Rhistory
 .RData
 .Ruserdata
+*.Rproj
 
 # ---- Temporary script
 *-Ex.R
