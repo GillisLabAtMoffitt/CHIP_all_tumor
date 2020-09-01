@@ -2,7 +2,7 @@
 library(tidyverse)
 library(data.table)
 
-####################################################################################################### I ### load data----
+################################################################################################### I ### load data----
 
 path <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", "CHIP in Avatar",
                  "M2GEN")
@@ -71,9 +71,11 @@ TMarkers_v4 <-
 Sequencing_v4 <- 
   read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/ClinicalSpecimen.csv")) %>% 
   select("AvatarKey", "ORIENSpecimenID", "WES", "AgeAtSpecimenCollection", "Tumor/Germline")
+SCT_v4 <- 
+  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/StemCellTransplant.csv"))
 
 
-####################################################################################################### II ### Data cleaning----
+################################################################################################### II ### Data cleaning----
 # Demographics
 Demographics <- bind_rows(Demo_v2, Demo_v4) %>%  # has no duplicate
   mutate(AgeAtFirstContact = case_when(
@@ -249,6 +251,18 @@ Sequencing <- bind_rows(Sequencing_v2, Sequencing_v4) %>%
   unique()
 Sequencing[duplicated(Sequencing$AvatarKey),] %>% arrange(AvatarKey)
 
+# SCT----
+SCT_v4 <- SCT_v4 %>% 
+  select(-row_id) %>% 
+  filter(SCTInd == "Yes") %>% 
+  distinct(AvatarKey, AgeAtTransplant, .keep_all = TRUE) %>% 
+  arrange(AgeAtTransplant)
+SCT <- dcast(setDT(SCT_v4), AvatarKey ~ rowid(AvatarKey),
+             value.var = c("AgeAtTransplant", "AgeAtTransplantFlag", "SCTPrimaryDiagnosisSiteCode",
+                           "SCTPrimaryDiagnosisSite", "TransplantType", "TransplantCellSource",
+                           "AgeAtPostTransStatus", "MRDTestInd", "AgeAtMRDTest")) 
+
+
 
 
 # Cleaning
@@ -256,16 +270,17 @@ rm(Demo_v2, Demo_v4, Vitals_v2, Vitals_v2a, Vitals_v4,
    Medication_v2, Medication_v4, Radiation_v2, Radiation_v4, Metastasis_No,
    Metastasis_Unknown, Metastasis_v2, Metastasis_v2_f, Metastasis_v4, metastasis_Yes,
    Staging_v2, Staging_v2_f, Staging_v4, Surgery_v2, Surgery_v4, TMarkers_v2, TMarkers_v4, 
-   Sequencing_v2, Sequencing_v4, uid)
-####################################################################################################### III ### Merging----
+   Sequencing_v2, Sequencing_v4, SCT_v4, uid)
+################################################################################################### III ### Merging----
 
 Global_data <- full_join(Sequencing, Demographics, by= "AvatarKey") %>% # Vitals
   full_join(., Staging, by= "AvatarKey") %>% 
   full_join(., Medication, by= "AvatarKey") %>% 
+  full_join(., SCT, by= "AvatarKey") %>% 
   full_join(., Radiation, by= "AvatarKey") %>% 
   full_join(., Surgery, by= "AvatarKey") %>% 
   full_join(., Metastasis, by= "AvatarKey") %>% 
-  full_join(., TMarkers, by= "AvatarKey") # %>% SCT
+  full_join(., TMarkers, by= "AvatarKey")
 
 
 
