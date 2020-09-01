@@ -76,7 +76,7 @@ SCT_v4 <-
 
 
 ################################################################################################### II ### Data cleaning----
-# Demographics
+# Demographics----
 Demographics <- bind_rows(Demo_v2, Demo_v4) %>%  # has no duplicate
   mutate(AgeAtFirstContact = case_when(
     AgeAtFirstContact == "Age 90 or Older" ~ 90,
@@ -99,16 +99,19 @@ Vitals_v4 <- Vitals_v4[(!grepl(uid, Vitals_v4$AvatarKey)),]
 # Medication----
 # Binds V2_V4, keep distinct row, and cast
 Medication_v2 <- Medication_v2 %>% 
-  rename(MedLineRegimen = "TreatmentLineCodeKey") %>% 
-  distinct(.)
-Medication_v4 <- Medication_v4 %>% 
-  distinct(.)
-medication <- bind_rows(Medication_v2, Medication_v4, .id = "versionMed") %>% 
-  distinct(.)
-Medication <- dcast(
-  setDT(medication),
+  rename(MedLineRegimen = "TreatmentLineCodeKey")
+
+medication <- bind_rows(Medication_v2, Medication_v4) %>% 
+  select(-c(RecordKey, row_id)) %>% 
+  arrange(ChangeOfTreatment) %>% 
+  distinct(AvatarKey, Medication, AgeAtMedStart, MedLineRegimen, MedContinuing, AgeAtMedStop, ChangeOfTreatment,
+           .keep_all = TRUE)
+medication$AvatarKey[which(duplicated(medication[c("AvatarKey", "Medication", "AgeAtMedStart", 
+                                                   "MedLineRegimen", "MedContinuing", "AgeAtMedStop")]))]
+# Have few duplicate but will be remove in the next step
+Medication <- dcast(setDT(medication),
   AvatarKey + AgeAtMedStart + CancerSiteForTreatment + CancerSiteForTreatmentCode +
-    MedContinuing + AgeAtMedStop ~ rowid(AvatarKey),
+    MedContinuing + AgeAtMedStop ~ rowid(AvatarKey), 
   value.var = c("Medication")) %>% 
   unite(Medication, "1":ncol(.), sep = "; ", na.rm = TRUE, remove = TRUE) %>% 
   arrange(AgeAtMedStart)
@@ -120,18 +123,16 @@ Medication <- dcast(setDT(Medication), AvatarKey ~ rowid(AvatarKey),
 # Radiation----
 Radiation_v2 <- Radiation_v2 %>% 
   rename(RadPrimaryDiagnosisSiteCode = "RadSiteCode") %>% 
-  rename(RadPrimaryDiagnosisSite = "RadSite") %>% 
-  distinct(.)
-Radiation_v4 <- Radiation_v4 %>% 
-  distinct(.)
+  rename(RadPrimaryDiagnosisSite = "RadSite")
 radiation <- bind_rows(Radiation_v2, Radiation_v4, .id = "versionRad") %>% 
-  distinct(.)
+  distinct(AvatarKey, AgeAtRadiationStart, RadPrimaryDiagnosisSiteCode, RadPrimaryDiagnosisSite, 
+           RadTreatmentLine, RadDose, RadSite, .keep_all = TRUE)
+
 Radiation <- dcast(setDT(radiation), AvatarKey+AgeAtRadiationStart+AgeAtRadiationStop+
                      RadSurgerySequence+RadTreatmentLine ~ rowid(AvatarKey),
                     value.var = c("AgeAtRadiationStopFlag", "RadModality", "RadDose", "RadSite",
                                   "RadPrimaryDiagnosisSiteCode", "RadPrimaryDiagnosisSite",
                                   "RadFractions"), sep = "_sequence")
-
 Radiation <- dcast(setDT(Radiation), AvatarKey ~ rowid(AvatarKey),
                    value.var = c("AgeAtRadiationStart", "AgeAtRadiationStop", "RadSurgerySequence", 
                                  "RadTreatmentLine",
@@ -153,7 +154,7 @@ Radiation <- dcast(setDT(Radiation), AvatarKey ~ rowid(AvatarKey),
 # remove the ID with follow up from the base file
 # So take Yes, No, Unknown independently 
 # remove the ID of Yes from No then Yes+No from Unknown
-Metastasis <- bind_rows(Metastasis_v2, Metastasis_v2_f, Metastasis_v4, .id = "versionMets")
+Metastasis <- bind_rows(Metastasis_v2, Metastasis_v2_f, Metastasis_v4, .id = "versionMets") # Will check for more cleaning----
 metastasis_Yes <- Metastasis %>% 
   filter(str_detect(MetastaticDiseaseInd, "Yes"))
 uid <- paste(unique(metastasis_Yes$AvatarKey), collapse = "|")
@@ -174,7 +175,7 @@ Metastasis <- dcast(setDT(metastasis), AvatarKey ~ rowid(AvatarKey),
 
 # Staging----
 Staging_v2 <- Staging_v2 %>% 
-  mutate(AgeAtPerformStatusMostRecent = case_when(
+  mutate(AgeAtPerformStatusMostRecent = case_when(# Will check for more cleaning----
     AgeAtPerformStatusMostRecent == "Age 90 or Older" ~ 90,
     TRUE ~ as.numeric(AgeAtPerformStatusMostRecent)
     )) %>% 
@@ -213,15 +214,32 @@ Surgery_v4 <- Surgery_v4 %>%
     AgeAtSurgeryBiopsy == "Age 90 or Older" ~ 90,
     TRUE ~ as.numeric(AgeAtSurgeryBiopsy)
   ))
+
+
+
 surgery <- bind_rows(Surgery_v2, Surgery_v4, .id = "version") %>% 
-  filter(SiteTherapeutic %in% c("Therapeutic", "Yes"))
+  filter(SiteTherapeutic %in% c("Therapeutic", "Yes")) %>%
+  select(-c(RecordKey, row_id)) %>% 
+  distinct(.)
+
+surgery$AvatarKey[which(duplicated(surgery[c("AvatarKey", "AgeAtSurgeryBiopsy")]))]
+
+Surgery <- dcast(setDT(surgery), AvatarKey+AgeAtSurgeryBiopsy ~ rowid(AvatarKey),
+                 value.var = c("SurgeryBiopsyLocation", "SurgeryBiopsyLocationCode",
+                               "PrimaryDiagnosisSiteCode", "PrimaryDiagnosisSite", 
+                               "MethodSurgicalResection"), sep = "_site") %>% 
+  unite(SurgeryBiopsyLocation, starts_with("SurgeryBiopsyLocation_"), sep = "; ", na.rm = TRUE, remove = TRUE) %>% 
+  unite(SurgeryBiopsyLocationCode, starts_with("SurgeryBiopsyLocationCode_"), sep = "; ", na.rm = TRUE, remove = TRUE) %>% 
+  unite(PrimaryDiagnosisSiteCode, starts_with("PrimaryDiagnosisSiteCode_"), sep = "; ", na.rm = TRUE, remove = TRUE) %>% 
+  unite(PrimaryDiagnosisSite, starts_with("PrimaryDiagnosisSite_"), sep = "; ", na.rm = TRUE, remove = TRUE) %>% 
+  unite(For_Resection, starts_with("MethodSurgicalResection_"), sep = "; ", na.rm = TRUE, remove = TRUE)
+  
+
+
 Surgery <- dcast(setDT(surgery), AvatarKey ~ rowid(AvatarKey),
-                 value.var = c("AgeAtSurgeryBiopsy", "AgeAtSurgeryBiopsyFlag", "YearOfSurgeryBiopsy",
-                               "SurgeryBiopsyLocation", "SurgeryBiopsyLocationCode", "SurgeryBiopsyInd",
-                               "PrimaryDiagnosisSiteCode",
-                               "PrimaryDiagnosisSite",
-                               "MethodSurgicalResection", "MethodSentinelLymphNode", "MethodSurgeryNOS",
-                               "MethodOther")) 
+                 value.var = c("AgeAtSurgeryBiopsy", "SurgeryBiopsyLocation", "SurgeryBiopsyLocationCode", 
+                               "PrimaryDiagnosisSiteCode", "PrimaryDiagnosisSite",
+                               "MethodSurgicalResection"), sep = "_regimen") 
 # write_csv(Surgery, paste0(path, "/output data/cleaned files/Surgery.csv"))
 
 # Tumor markers
