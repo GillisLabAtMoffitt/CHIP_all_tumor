@@ -214,15 +214,10 @@ Surgery_v4 <- Surgery_v4 %>%
     AgeAtSurgeryBiopsy == "Age 90 or Older" ~ 90,
     TRUE ~ as.numeric(AgeAtSurgeryBiopsy)
   ))
-
-
-
 surgery <- bind_rows(Surgery_v2, Surgery_v4, .id = "version") %>% 
   filter(SiteTherapeutic %in% c("Therapeutic", "Yes")) %>%
   select(-c(RecordKey, row_id)) %>% 
   distinct(.)
-
-surgery$AvatarKey[which(duplicated(surgery[c("AvatarKey", "AgeAtSurgeryBiopsy")]))]
 
 Surgery <- dcast(setDT(surgery), AvatarKey+AgeAtSurgeryBiopsy ~ rowid(AvatarKey),
                  value.var = c("SurgeryBiopsyLocation", "SurgeryBiopsyLocationCode",
@@ -233,18 +228,14 @@ Surgery <- dcast(setDT(surgery), AvatarKey+AgeAtSurgeryBiopsy ~ rowid(AvatarKey)
   unite(PrimaryDiagnosisSiteCode, starts_with("PrimaryDiagnosisSiteCode_"), sep = "; ", na.rm = TRUE, remove = TRUE) %>% 
   unite(PrimaryDiagnosisSite, starts_with("PrimaryDiagnosisSite_"), sep = "; ", na.rm = TRUE, remove = TRUE) %>% 
   unite(For_Resection, starts_with("MethodSurgicalResection_"), sep = "; ", na.rm = TRUE, remove = TRUE)
-  
-
-
 Surgery <- dcast(setDT(surgery), AvatarKey ~ rowid(AvatarKey),
                  value.var = c("AgeAtSurgeryBiopsy", "SurgeryBiopsyLocation", "SurgeryBiopsyLocationCode", 
                                "PrimaryDiagnosisSiteCode", "PrimaryDiagnosisSite",
                                "MethodSurgicalResection"), sep = "_regimen") 
 # write_csv(Surgery, paste0(path, "/output data/cleaned files/Surgery.csv"))
 
-# Tumor markers
-
-TMarkers_v2 <- TMarkers_v2 %>% 
+# Tumor markers----
+TMarkers_v2 <- TMarkers_v2 %>% # Need more cleaning for when followup
   mutate(TMarkerLowRange = case_when(
     TMarkerLowRange == "0.0 TO 35.0" ~ 35,
     TRUE ~ as.numeric(TMarkerLowRange)
@@ -270,7 +261,7 @@ Sequencing <- bind_rows(Sequencing_v2, Sequencing_v4) %>%
 Sequencing[duplicated(Sequencing$AvatarKey),] %>% arrange(AvatarKey)
 
 # SCT----
-SCT_v4 <- SCT_v4 %>% 
+SCT_v4 <- SCT_v4 %>% # Need more cleaning for when followup
   select(-row_id) %>% 
   filter(SCTInd == "Yes") %>% 
   distinct(AvatarKey, AgeAtTransplant, .keep_all = TRUE) %>% 
