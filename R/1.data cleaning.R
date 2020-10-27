@@ -75,6 +75,12 @@ Sequencing_v4 <-
 SCT_v4 <- 
   read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/StemCellTransplant.csv"))
 
+path1 <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", "CHIP in Avatar",
+                  "Jamie")
+Clinical_linkage <- read.delim(paste0(path1, "/wes_somatic_mutations_metadata_v0.4.5.txt")) %>% 
+  select(c("subject", "ClinicalSpecimenLinkage_DiseaseType", "ClinicalSpecimenLinkage_AgeAtSpecimenCollection")) %>% 
+  arrange(ClinicalSpecimenLinkage_AgeAtSpecimenCollection) %>% 
+  distinct(subject, .keep_all = TRUE)
 
 ################################################################################################### II ### Data cleaning----
 # Demographics----
@@ -290,7 +296,8 @@ Global_data <- full_join(Sequencing, Demographics, by= "AvatarKey") %>% # Vitals
   full_join(., Radiation, by= "AvatarKey") %>% 
   full_join(., Surgery, by= "AvatarKey") %>% 
   full_join(., Metastasis, by= "AvatarKey") %>% 
-  full_join(., TMarkers, by= "AvatarKey")
+  full_join(., TMarkers, by= "AvatarKey") %>% 
+  left_join(., Clinical_linkage %>% select(c("subject", "ClinicalSpecimenLinkage_DiseaseType")), by= c("AvatarKey" = "subject"))
 
 
 

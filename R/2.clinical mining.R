@@ -16,15 +16,7 @@ Demographics %>%
   coord_flip() +
   labs(x="Gender", y="Age at First Contact", title="Age repartition per gender")
 
-
-
-
-"AgeAtSpecimenCollection"                       
-[5] "Tumor/Germline"                                 "RecordKey"                                     
-[7] "Sex"                                            "Race"                                          
-[9] "Ethnicity"                                      "AgeAtFirstContact"
-PrimaryDiagnosisSiteCode_1, Histology_1
-
+# Prep _______TO PLACE BEFORE
 Global_data <- Global_data %>% 
   mutate(AgeAtDiagnosis_1 = as.numeric(AgeAtDiagnosis_1)) %>% 
   mutate(Race = case_when(
@@ -53,23 +45,15 @@ Global_data <- Global_data %>%
     )) %>% 
   mutate(Ethnicity = factor(Ethnicity, levels = c("Non-Spanish", "Spanish", "Unknown")))
 
-# # table1 <- 
-#   Global_data %>%
-#   # mutate_at(("Race"), ~ case_when(
-#   #   . == "African American" ~ "Black",
-#   #   TRUE ~ .
-#   # )) %>% 
-#   # mutate(Race = factor(Race, levels=c("White", "Black", "Others"))) %>%
-#   select(AgeAtDiagnosis_1, Race) %>% 
-#   tbl_summary(by = Race , statistic = all_continuous() ~ "{median} ({sd})", 
-#               digits = list(c(AgeAtDiagnosis_1, Race) ~ 2)) %>% 
-#   add_p()
 
+sum(is.na(Global_data$ClinicalSpecimenLinkage_DiseaseType))
+# Summary table
 demo_table <- 
-  Global_data %>% select("AgeAtDiagnosis_1", "Sex", "Race", "Ethnicity", "Histology_1") %>% 
-  tbl_summary(missing = "no") %>% 
+  Global_data %>% select('Age At Diagnosis' = "AgeAtDiagnosis_1", "Sex", "Race", "Ethnicity", 'Disease Type' = "ClinicalSpecimenLinkage_DiseaseType") %>% 
+  tbl_summary(missing = "no", sort = list(everything() ~ "frequency")) %>% 
+  italicize_labels() %>% 
   as_gt
-gt::gtsave(demo_table, expand = 1, zoom = 2, 
+gt::gtsave(demo_table, expand = 1, zoom = 1, 
              paste0(
                path, 
                "/output data/Demographic table summary.pdf"))
