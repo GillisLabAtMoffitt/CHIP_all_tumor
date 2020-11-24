@@ -88,34 +88,59 @@ Demographics <- bind_rows(Demo_v2, Demo_v4) %>%  # has no duplicate
   mutate(AgeAtFirstContact = case_when(
     AgeAtFirstContact == "Age 90 or Older" ~ 90,
     TRUE ~ as.numeric(AgeAtFirstContact)
-  ))
+  )) %>% 
+  mutate(Race = case_when(
+    str_detect(Race, "American")                              ~ "American Indian",
+    str_detect(Race, "Asian|Chinese|Filipino|Pakistani|Polynesian|Vietnamese")
+                                                              ~ "Asian",
+    str_detect(Race, "Unknown")                               ~ "Unknown",
+    TRUE                                                      ~ Race
+  )) %>% 
+  mutate(Race = factor(Race, levels = c("White", "Black", "Other", "Asian", "Unknown", "American Indian"))) %>% 
+  mutate(Ethnicity = case_when(
+    Ethnicity %in% c("Non-Spanish; Non-Hispanic", "Spanish Surname Only")            ~ "Non-Spanish",
+    str_detect(Ethnicity, "Mexican|Cuban|Domincian|Spanish|Puerto|American")         ~ "Spanish",
+    str_detect(Ethnicity, "Unknown")                                                 ~ "Unknown",
+    TRUE                                                                             ~ Ethnicity
+  )) %>% 
+  mutate(Ethnicity = factor(Ethnicity, levels = c("Non-Spanish", "Spanish", "Unknown")))
+  
 
 # Vitals
 Vitals_v2$AvatarKey[which(duplicated(Vitals_v2$AvatarKey))]
-Vitals_v2a <- Vitals_v2 %>% 
+Vitals_v2 <- Vitals_v2 %>% ## PROBLEM : Found patient with 2 age at date, ex: A007107 ##
   arrange(desc(VitalStatusConfirmed) , AgeAtDeath, EstAgeAtLastContact) %>% # Will keep the earliest date A016365
-  distinct(AvatarKey, .keep_all = TRUE)
+  distinct(AvatarKey, .keep_all = TRUE) %>% 
+  rename(AgeAtLastContact = "EstAgeAtLastContact")
 
 Vitals_v4$AvatarKey[which(duplicated(Vitals_v4$AvatarKey))]
+Vitals_v4 <- Vitals_v4 %>%
+  arrange(desc(VitalStatusConfirmed) , AgeAtDeath) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
 # Same problem
 
 # Do we have same id in v2 and v4 -> No, so good
 uid <- paste(unique(Vitals_v2$AvatarKey), collapse = "|")
 Vitals_v4 <- Vitals_v4[(!grepl(uid, Vitals_v4$AvatarKey)),]
+# Bind
+Vitals <- bind_rows(Vitals_v2, Vitals_v4, .id = "version_vital") %>% 
+  select(c("version_vital", "AvatarKey", "VitalStatus", "AgeAtDeath", "YearOfDeath", "CauseOfDeath", 
+           "VitalStatus_av", "AgeAtDeath_av", "AgeAtDeath_bids", 
+           "VitalStatusConfirmed", "VitalStatusSource", "AgeAtLastContact"))
 
 # Medication----
 # Binds V2_V4, keep distinct row, and cast
 Medication_v2 <- Medication_v2 %>% 
-  rename(MedLineRegimen = "TreatmentLineCodeKey")
+  rename(MedLineRegimen = "TreatmentLineCodeKey") %>% 
+  select(-c("RecordKey", "AgeAtMedStartFlag", "YearOfMedStart", "AgeAtMedStopFlag", "row_id"))
+Medication_v4 <- Medication_v4 %>%
+  select(-c("MedicationInd", "MedReasonNoneGiven", "AgeAtMedStartFlag", "YearOfMedStart", "YearOfMedStart", 
+            "AgeAtMedStopFlag", "YearOfMedStop", "SystemicSurgerySequence", "row_id"))
 
-medication <- bind_rows(Medication_v2, Medication_v4) %>% 
-  select(-c(RecordKey, row_id)) %>% 
-  arrange(ChangeOfTreatment) %>% 
-  distinct(AvatarKey, Medication, AgeAtMedStart, MedLineRegimen, MedContinuing, AgeAtMedStop, ChangeOfTreatment,
-           .keep_all = TRUE)
-medication$AvatarKey[which(duplicated(medication[c("AvatarKey", "Medication", "AgeAtMedStart", 
-                                                   "MedLineRegimen", "MedContinuing", "AgeAtMedStop")]))]
-# Have few duplicate but will be remove in the next step
+medication <- bind_rows(Medication_v2, Medication_v4, .id = "version") %>% 
+  distinct()
+
+# dcast per regimen first then per patient
 Medication <- dcast(setDT(medication),
   AvatarKey + AgeAtMedStart + CancerSiteForTreatment + CancerSiteForTreatmentCode +
     MedContinuing + AgeAtMedStop ~ rowid(AvatarKey), 
