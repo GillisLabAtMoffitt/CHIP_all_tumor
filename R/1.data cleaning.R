@@ -183,6 +183,7 @@ Radiation <- dcast(setDT(Radiation), AvatarKey ~ rowid(AvatarKey),
 # write_csv(Radiation, paste0(path, "/output data/cleaned files/Radiation.csv"))
 
 # Metastasis----
+# Some patients show "Yes", "No" AND "Unknown" so may be because no date of follow up
 # remove the ID with follow up from the base file
 # So take Yes, No, Unknown independently 
 # remove the ID of Yes from No then Yes+No from Unknown
