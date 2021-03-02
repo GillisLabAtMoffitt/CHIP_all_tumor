@@ -59,4 +59,20 @@ gt::gtsave(demo_table, expand = 1, zoom = 1,
                "/output data/Demographic table summary.pdf"))
 
 
+####################################################################################################### II ### Treatment mining----
+# List of all drugs
+drugs <- medication %>% select(Medication) %>% group_by(Medication) %>% mutate(n= n()) %>% distinct() %>% arrange(desc(n))
+write_csv(drugs, path = paste0(path, "/output data/Drugs/list of all drugs.csv"))
+# medication %>% select(Medication) %>% tbl_summary(sort = list(everything() ~ "frequency"))
+
+
+
+
+
+
+
+
+
+
+
 

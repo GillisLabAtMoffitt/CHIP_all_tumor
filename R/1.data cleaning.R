@@ -141,13 +141,13 @@ medication <- bind_rows(Medication_v2, Medication_v4, .id = "version") %>%
   distinct()
 
 # dcast per regimen first then per patient
-Medication <- dcast(setDT(medication),
-  AvatarKey + AgeAtMedStart + CancerSiteForTreatment + CancerSiteForTreatmentCode +
+Medication1 <- dcast(setDT(medication),
+  AvatarKey + MedLineRegimen + AgeAtMedStart + CancerSiteForTreatment + CancerSiteForTreatmentCode +
     MedContinuing + AgeAtMedStop ~ rowid(AvatarKey), 
   value.var = c("Medication")) %>% 
   unite(Medication, "1":ncol(.), sep = "; ", na.rm = TRUE, remove = TRUE) %>% 
   arrange(AgeAtMedStart)
-Medication <- dcast(setDT(Medication), AvatarKey ~ rowid(AvatarKey),
+Medication <- dcast(setDT(Medication1), AvatarKey ~ rowid(AvatarKey),
                      value.var = c("Medication", "AgeAtMedStart", "AgeAtMedStop", "CancerSiteForTreatment",
                                    "CancerSiteForTreatmentCode", "MedContinuing"), sep = "_regimen")
 # write_csv(Medication, paste0(path, "/output data/cleaned files/Medication.csv"))
