@@ -75,6 +75,9 @@ Sequencing_v4 <-
 SCT_v4 <- 
   read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/StemCellTransplant.csv"))
 
+cardiotox <- 
+  readxl::read_xlsx(paste0(path, "/other data/Cardiotoxic drugs Jamila.xlsx"), na = "NA", n_max = 53)
+
 path1 <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", "CHIP in Avatar",
                   "Jamie")
 Clinical_linkage <- read.delim(paste0(path1, "/wes_somatic_mutations_metadata_v0.4.5.txt")) %>% 
@@ -83,6 +86,18 @@ Clinical_linkage <- read.delim(paste0(path1, "/wes_somatic_mutations_metadata_v0
   distinct(subject, .keep_all = TRUE)
 
 ################################################################################################### II ### Data cleaning----
+# Cardiotoxicities
+cardiotox <- cardiotox %>% 
+  `colnames<-`(str_replace_all(colnames(.), " ", "_")) %>% 
+  fill(Chemoterapeutical_drug, Incidence_rate, Cardiovascular_manifestations, .direction = "down") %>% 
+  mutate(Drug_names = tolower(Drug_names),
+         Drug_names = str_replace_all(Drug_names, ", and | and |, ", "|"), 
+         
+         Drug_names = str_remove(Drug_names, "5-|.*: "), 
+         Drug_names = gsub("\\(.*?)", "", Drug_names),
+         Drug_names = str_replace_all(Drug_names, "interferon-alfa", "interferon alfa")) 
+  # mutate(across(everything(), ~na_if(., "NA")))
+
 # Demographics----
 Demographics <- bind_rows(Demo_v2, Demo_v4) %>%  # has no duplicate
   mutate(AgeAtFirstContact = case_when(
@@ -131,14 +146,16 @@ Vitals <- bind_rows(Vitals_v2, Vitals_v4, .id = "version_vital") %>%
 # Medication----
 # Binds V2_V4, keep distinct row, and cast
 Medication_v2 <- Medication_v2 %>% 
-  rename(MedLineRegimen = "TreatmentLineCodeKey") %>% 
+  rename(MedLineRegimen = "TreatmentLineCodeKey", MedPrimaryDiagnosisSiteCode = "CancerSiteForTreatment", 
+         MedPrimaryDiagnosisSite = "CancerSiteForTreatmentCode") %>% 
   select(-c("RecordKey", "AgeAtMedStartFlag", "YearOfMedStart", "AgeAtMedStopFlag", "row_id"))
 Medication_v4 <- Medication_v4 %>%
   select(-c("MedicationInd", "MedReasonNoneGiven", "AgeAtMedStartFlag", "YearOfMedStart", "YearOfMedStart", 
             "AgeAtMedStopFlag", "YearOfMedStop", "SystemicSurgerySequence", "row_id"))
 
 medication <- bind_rows(Medication_v2, Medication_v4, .id = "version") %>% 
-  distinct()
+  distinct() %>% 
+  mutate(Medication = tolower(Medication))
 
 # dcast per regimen first then per patient
 Medication1 <- dcast(setDT(medication),

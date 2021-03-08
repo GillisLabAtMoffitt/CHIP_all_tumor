@@ -65,12 +65,16 @@ drugs <- medication %>% select(Medication) %>% group_by(Medication) %>% mutate(n
 write_csv(drugs, path = paste0(path, "/output data/Drugs/list of all drugs.csv"))
 # medication %>% select(Medication) %>% tbl_summary(sort = list(everything() ~ "frequency"))
 
+# Cardiotoxic drugs
+cardiotox_drugs <- paste0(cardiotox$Drug_names, collapse = "|")
 
-
-
-
-
-
+drug_tox_patients <- medication[(grepl(cardiotox_drugs, medication$Medication)),] %>% 
+  distinct(AvatarKey, Medication, .keep_all = TRUE) %>% 
+  group_by(AvatarKey) %>% 
+  mutate(count_total_cardiotoxic_drug = n()) %>% 
+  select(c("AvatarKey", "Medication", "count_total_cardiotoxic_drug", 
+           "MedPrimaryDiagnosisSiteCode", "MedPrimaryDiagnosisSite"))
+write_csv(drug_tox_patients, paste0(path, "/output data/Drugs/patients receiving cardiotoxic drugs.csv"))
 
 
 
