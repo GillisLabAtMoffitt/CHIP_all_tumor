@@ -8,6 +8,15 @@ library(gtsummary)
 path <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", "CHIP in Avatar",
                  "M2GEN")
 
+mrn1 <-
+  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/MRN.csv")) %>% 
+  filter(!is.na(MRN))
+mrn2 <-
+  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/MRN.csv")) %>% 
+  filter(!is.na(MRN))
+mrn <- bind_rows(mrn1, mrn2) %>% 
+  distinct()
+rm(mrn1, mrn2)
 # myfiles = list.files(path = paste0(path,
 #   "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events"
 # ), pattern = "*.csv", full.names = TRUE)
@@ -146,8 +155,8 @@ Vitals <- bind_rows(Vitals_v2, Vitals_v4, .id = "version_vital") %>%
 # Medication----
 # Binds V2_V4, keep distinct row, and cast
 Medication_v2 <- Medication_v2 %>% 
-  rename(MedLineRegimen = "TreatmentLineCodeKey", MedPrimaryDiagnosisSiteCode = "CancerSiteForTreatment", 
-         MedPrimaryDiagnosisSite = "CancerSiteForTreatmentCode") %>% 
+  rename(MedLineRegimen = "TreatmentLineCodeKey", MedPrimaryDiagnosisSiteCode = "CancerSiteForTreatmentCode", 
+         MedPrimaryDiagnosisSite = "CancerSiteForTreatment") %>% 
   select(-c("RecordKey", "AgeAtMedStartFlag", "YearOfMedStart", "AgeAtMedStopFlag", "row_id"))
 Medication_v4 <- Medication_v4 %>%
   select(-c("MedicationInd", "MedReasonNoneGiven", "AgeAtMedStartFlag", "YearOfMedStart", "YearOfMedStart", 
@@ -155,18 +164,18 @@ Medication_v4 <- Medication_v4 %>%
 
 medication <- bind_rows(Medication_v2, Medication_v4, .id = "version") %>% 
   distinct() %>% 
-  mutate(Medication = tolower(Medication))
+  mutate(Medication = tolower(Medication), MedPrimaryDiagnosisSite = tolower(MedPrimaryDiagnosisSite))
 
 # dcast per regimen first then per patient
 Medication1 <- dcast(setDT(medication),
-  AvatarKey + MedLineRegimen + AgeAtMedStart + CancerSiteForTreatment + CancerSiteForTreatmentCode +
+  AvatarKey + MedLineRegimen + AgeAtMedStart + MedPrimaryDiagnosisSite + MedPrimaryDiagnosisSiteCode +
     MedContinuing + AgeAtMedStop ~ rowid(AvatarKey), 
   value.var = c("Medication")) %>% 
   unite(Medication, "1":ncol(.), sep = "; ", na.rm = TRUE, remove = TRUE) %>% 
   arrange(AgeAtMedStart)
 Medication <- dcast(setDT(Medication1), AvatarKey ~ rowid(AvatarKey),
-                     value.var = c("Medication", "AgeAtMedStart", "AgeAtMedStop", "CancerSiteForTreatment",
-                                   "CancerSiteForTreatmentCode", "MedContinuing"), sep = "_regimen")
+                     value.var = c("Medication", "AgeAtMedStart", "AgeAtMedStop", "MedPrimaryDiagnosisSite",
+                                   "MedPrimaryDiagnosisSiteCode", "MedContinuing"), sep = "_regimen")
 # write_csv(Medication, paste0(path, "/output data/cleaned files/Medication.csv"))
 
 # Radiation----

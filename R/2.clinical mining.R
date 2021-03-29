@@ -61,20 +61,52 @@ gt::gtsave(demo_table, expand = 1, zoom = 1,
 
 ####################################################################################################### II ### Treatment mining----
 # List of all drugs
-drugs <- medication %>% select(Medication) %>% group_by(Medication) %>% mutate(n= n()) %>% distinct() %>% arrange(desc(n))
-write_csv(drugs, path = paste0(path, "/output data/Drugs/list of all drugs.csv"))
+# drugs <- medication %>% select(Medication) %>% group_by(Medication) %>% mutate(n= n()) %>% distinct() %>% arrange(desc(n))
+# write_csv(drugs, path = paste0(path, "/output data/Drugs/list of all drugs.csv"))
 # medication %>% select(Medication) %>% tbl_summary(sort = list(everything() ~ "frequency"))
 
 # Cardiotoxic drugs
-cardiotox_drugs <- paste0(cardiotox$Drug_names, collapse = "|")
+cardiotox_drugs <- paste0(unique(cardiotox$Drug_names), collapse = "|")
 
 drug_tox_patients <- medication[(grepl(cardiotox_drugs, medication$Medication)),] %>% 
-  distinct(AvatarKey, Medication, .keep_all = TRUE) %>% 
+  distinct(AvatarKey, Medication, AgeAtMedStart, AgeAtMedStop, .keep_all = TRUE) %>% 
   group_by(AvatarKey) %>% 
-  mutate(count_total_cardiotoxic_drug = n()) %>% 
-  select(c("AvatarKey", "Medication", "count_total_cardiotoxic_drug", 
-           "MedPrimaryDiagnosisSiteCode", "MedPrimaryDiagnosisSite"))
+  mutate(count_total_times_cardiotoxic_drug = n()) %>% 
+  select(c("AvatarKey", "Medication", "count_total_times_cardiotoxic_drug", AgeAtMedStart, AgeAtMedStop,
+           "MedPrimaryDiagnosisSite")) %>% 
+  ungroup() %>% 
+  arrange(AvatarKey, AgeAtMedStart) %>% 
+  left_join(. , mrn, by = "AvatarKey")
 write_csv(drug_tox_patients, paste0(path, "/output data/Drugs/patients receiving cardiotoxic drugs.csv"))
+
+tbl <- drug_tox_patients %>% 
+  distinct(AvatarKey, .keep_all = TRUE) %>%
+  select("MedPrimaryDiagnosisSite", 
+         "MedPrimaryDiagnosisSiteCode") %>% 
+  tbl_summary() %>% bold_labels() %>% as_gt()
+gt::gtsave(tbl, zoom = 1, paste0(path, "/output data/Drugs/cancer summary of patients with cardiotoxic drugs.pdf"))
+
+tbl <- drug_tox_patients %>% 
+  distinct(AvatarKey, .keep_all = TRUE) %>%
+  select("count_total_cardiotoxic_drug") %>% 
+  tbl_summary() %>% bold_labels() %>% as_gt()
+gt::gtsave(tbl, zoom = 1, paste0(path, "/output data/Drugs/Drugs summary of patients with cardiotoxic drugs.pdf"))
+
+tbl <- drug_tox_patients %>% 
+  mutate(Whole = "count of drugs") %>% 
+  select("Medication", Whole) %>% 
+  tbl_summary(by = Whole) %>% bold_labels() %>% as_gt() %>% 
+  gt::tab_source_note(gt::md("*same drugs for a patients are counted*"))
+gt::gtsave(tbl, zoom = 1, paste0(path, "/output data/Drugs/Drugs name summary of patients with cardiotoxic drugs.pdf"))
+
+
+tbl <- drug_tox_patients %>% 
+  distinct(AvatarKey, Medication, .keep_all = TRUE) %>%
+  mutate(Whole = "count of drugs") %>% 
+  select("Medication", Whole) %>% 
+  tbl_summary(by = Whole) %>% bold_labels() %>% as_gt() %>% 
+  gt::tab_source_note(gt::md("*same drugs for a patients are counted only once*"))
+gt::gtsave(tbl, zoom = 1, paste0(path, "/output data/Drugs/Drugs name summary of patients with cardiotoxic drugs2.pdf"))
 
 
 
