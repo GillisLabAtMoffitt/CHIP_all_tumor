@@ -60,6 +60,19 @@ Sequencing_v2 <-
   read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/ClinicalSpecimen.csv")) %>% 
   select("AvatarKey", "ORIENSpecimenID", "WES", "AgeAtSpecimenCollection", "Tumor/Germline")
 
+Indicators_v2 <-
+  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/Indicators.csv")) %>% 
+  select("AvatarKey", "COPDDiagnosisInd", "CVAStrokeDiagnosisInd", "InsulinDependentDiabetesMellitusDiagnosisInd", 
+         "HypertensionDiagnosisInd", "MIHeartFailureDiagnosisInd", "VenousThrombosisDrugToxicityInd") %>% 
+  distinct()
+Follow_indicators_v2 <-
+  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/FollowUpIndicators.csv")) %>% 
+  select("AvatarKey", "COPDDiagnosisInd", "CVAStrokeDiagnosisInd", "InsulinDependentDiabetesMellitusDiagnosisInd", 
+         "HypertensionDiagnosisInd", "MIHeartFailureDiagnosisInd", "VenousThrombosisDrugToxicityInd") %>% 
+  distinct()
+colnames(Follow_indicators_v2)[2:ncol(Follow_indicators_v2)] <- 
+  paste("fw", colnames(Follow_indicators_v2)[2:ncol(Follow_indicators_v2)], sep = "_")
+
 # V4----
 Demo_v4 <- read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/PatientMaster.csv"))
 Vitals_v4 <-
@@ -83,6 +96,14 @@ Sequencing_v4 <-
   select("AvatarKey", "ORIENSpecimenID", "WES", "AgeAtSpecimenCollection", "Tumor/Germline")
 SCT_v4 <- 
   read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/StemCellTransplant.csv"))
+
+Indicators_v4 <-
+  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/PatientHistory.csv")) %>% 
+  select("AvatarKey", "SmokingStatus", "COPDDiagnosisInd", "CVAStrokeDiagnosisInd", "DVTDiagnosisInd",
+         "HypercholesterolemiaDiagnosisInd", "HyperlipidemiaDiagnosisInd", 
+         "InsulinDependentDiabetesMellitusDiagnosisInd", 
+         "HypertensionDiagnosisInd", "HeartDiseaseDiagnosisInd", "MIHeartFailureDiagnosisInd",
+         "PulmonaryEmbolismDiagnosisInd", "VenousThrombosisDrugToxicityInd")
 
 cardiotox <- 
   readxl::read_xlsx(paste0(path, "/other data/Cardiotoxic drugs Jamila.xlsx"), na = "NA", n_max = 53)

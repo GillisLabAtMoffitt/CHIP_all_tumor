@@ -60,6 +60,16 @@ gt::gtsave(demo_table, expand = 1, zoom = 1,
 
 
 ####################################################################################################### II ### Treatment mining----
+# Indicators
+ind_col_names <- paste0(colnames(Indicators_v2), collapse = "|")
+Indicators_v2 <- full_join(Indicators_v2, Follow_indicators_v2, by = "AvatarKey")
+Indicators <- bind_rows(Indicators_v2, Indicators_v4, .id = "version") %>% 
+  mutate(version = ifelse(version == 1, "v2", "v4")) %>% 
+  # mutate(SmokingStatus = ifelse(version == "v2", "not recorded in v2", SmokingStatus)) %>% 
+  mutate_at(c("SmokingStatus", "DVTDiagnosisInd", "HypercholesterolemiaDiagnosisInd",
+            "HyperlipidemiaDiagnosisInd", "HeartDiseaseDiagnosisInd", "PulmonaryEmbolismDiagnosisInd"), 
+            ~ ifelse(version == "v2", "not recorded in v2", .))
+ 
 # List of all drugs
 # drugs <- medication %>% select(Medication) %>% group_by(Medication) %>% mutate(n= n()) %>% distinct() %>% arrange(desc(n))
 # write_csv(drugs, path = paste0(path, "/output data/Drugs/list of all drugs.csv"))
@@ -76,8 +86,11 @@ drug_tox_patients <- medication[(grepl(cardiotox_drugs, medication$Medication)),
            "MedPrimaryDiagnosisSite")) %>% 
   ungroup() %>% 
   arrange(AvatarKey, AgeAtMedStart) %>% 
-  left_join(. , mrn, by = "AvatarKey")
-write_csv(drug_tox_patients, paste0(path, "/output data/Drugs/patients receiving cardiotoxic drugs.csv"))
+  left_join(. , mrn, by = "AvatarKey") %>% 
+  left_join(., Indicators, by = "AvatarKey")
+
+
+write_csv(drug_tox_patients, paste0(path, "/output data/Drugs/patients receiving cardiotoxic drugs with indicators.csv"))
 
 tbl <- drug_tox_patients %>% 
   distinct(AvatarKey, .keep_all = TRUE) %>%
