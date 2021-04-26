@@ -122,6 +122,35 @@ tbl <- drug_tox_patients %>%
 gt::gtsave(tbl, zoom = 1, paste0(path, "/output data/Drugs/Drugs name summary of patients with cardiotoxic drugs2.pdf"))
 
 
+tox_patient_ids <- paste0(drug_tox_patients$AvatarKey, collapse = "|")
+
+tox_patient_data <- Vitals[(!grepl(tox_patient_ids, Vitals$AvatarKey)),] %>% 
+  right_join(mrn, ., by = "AvatarKey") %>% 
+  left_join(., Age, by = "MRN") %>% 
+  mutate(sec_birth = duration(AgeAtDeath, units = "years")) %>% 
+  mutate(calc_date_death = as.Date(date_of_birth) + sec_birth) %>% 
+  mutate(days_calc = AgeAtDeath*364.25) %>% 
+  mutate(calc_date_death2 = as.Date(date_of_birth) + (days_calc))
+  
+
+Vitals$AgeAtDeath_av2 <- as.integer(Vitals$AgeAtDeath_av)
+mydatetime + lubridate::days(1)
+
+tox_patient_data$calc_date_death = tox_patient_data$date_of_birth + dyears(tox_patient_data$AgeAtDeath_av)
+
+tox_patient_data$calc_date_death = add_years(tox_patient_data$date_of_birth, (tox_patient_data$AgeAtDeath))
+
+                                             
+x <- year_month_day(2019, 1, 1)
+
+add_years(x, 1:5)
 
 
+
+
+                                             
+                                             
+                                             
+                                             
+                                             
 

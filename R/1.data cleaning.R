@@ -1,6 +1,7 @@
 # import packages
 library(tidyverse)
 library(data.table)
+library(lubridate)
 library(gtsummary)
 
 ################################################################################################### I ### load data----
@@ -108,6 +109,15 @@ Indicators_v4 <-
 cardiotox <- 
   readxl::read_xlsx(paste0(path, "/other data/Cardiotoxic drugs Jamila.xlsx"), na = "NA", n_max = 53)
 
+Age <- 
+  readxl::read_xlsx(paste0(path, "/Yifen data/Demographics_Report.xlsx")) %>% 
+  mutate(date_of_death = case_when(
+    `Vital Status` == "Dead"          ~ `Vital Status Date`, 
+    TRUE                              ~ NA_POSIXct_)) %>% 
+  select(c("MRN", date_of_birth = `Date of Birth`, `Vital Status`, "date_of_death"))
+
+
+
 path1 <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", "CHIP in Avatar",
                   "Jamie")
 Clinical_linkage <- read.delim(paste0(path1, "/wes_somatic_mutations_metadata_v0.4.5.txt")) %>% 
@@ -130,10 +140,10 @@ cardiotox <- cardiotox %>%
 
 # Demographics----
 Demographics <- bind_rows(Demo_v2, Demo_v4) %>%  # has no duplicate
-  mutate(AgeAtFirstContact = case_when(
-    AgeAtFirstContact == "Age 90 or Older" ~ 90,
-    TRUE ~ as.numeric(AgeAtFirstContact)
-  )) %>% 
+  # mutate(AgeAtFirstContact = case_when(
+  #   AgeAtFirstContact == "Age 90 or Older" ~ 90,
+  #   TRUE ~ as.numeric(AgeAtFirstContact)
+  # )) %>% 
   mutate(Race = case_when(
     str_detect(Race, "American")                              ~ "American Indian",
     str_detect(Race, "Asian|Chinese|Filipino|Pakistani|Polynesian|Vietnamese")
