@@ -87,7 +87,15 @@ drug_tox_patients <- medication[(grepl(cardiotox_drugs, medication$Medication)),
   ungroup() %>% 
   arrange(AvatarKey, AgeAtMedStart) %>% 
   left_join(. , mrn, by = "AvatarKey") %>% 
-  left_join(., Indicators, by = "AvatarKey")
+  left_join(., Indicators, by = "AvatarKey") %>% 
+  left_join(., Age %>% select("MRN", "date_of_birth"), by = "MRN") %>% 
+  # mutate(sec_birth = duration(AgeAtDeath, units = "years")) %>% 
+  # mutate(calc_date_death = as.Date(date_of_birth) + sec_birth) %>% 
+  mutate(across(starts_with("Age"), ~ as.numeric(.))) %>% 
+  mutate(med_start_date = as.Date(date_of_birth) + ((AgeAtMedStart*365)+1)) %>% 
+  mutate(med_stop_date = as.Date(date_of_birth) + ((AgeAtMedStop*365)+1)) %>% 
+  select("AvatarKey", "MRN", "count_total_times_cardiotoxic_drug", "AgeAtMedStart","AgeAtMedStop", "Medication",  
+         med_start_date, med_stop_date, everything(), -version)
 
 
 write_csv(drug_tox_patients, paste0(path, "/output data/Drugs/patients receiving cardiotoxic drugs with indicators.csv"))
@@ -127,10 +135,12 @@ tox_patient_ids <- paste0(drug_tox_patients$AvatarKey, collapse = "|")
 tox_patient_data <- Vitals[(!grepl(tox_patient_ids, Vitals$AvatarKey)),] %>% 
   right_join(mrn, ., by = "AvatarKey") %>% 
   left_join(., Age, by = "MRN") %>% 
-  mutate(sec_birth = duration(AgeAtDeath, units = "years")) %>% 
-  mutate(calc_date_death = as.Date(date_of_birth) + sec_birth) %>% 
-  mutate(days_calc = AgeAtDeath*364.25) %>% 
-  mutate(calc_date_death2 = as.Date(date_of_birth) + (days_calc))
+  # mutate(sec_birth = duration(AgeAtDeath, units = "years")) %>% 
+  # mutate(calc_date_death = as.Date(date_of_birth) + sec_birth) %>% 
+  mutate(days_calc_365 = AgeAtDeath*365) %>% 
+  mutate(calc_date_death2 = as.Date(date_of_birth) + (days_calc_365)) # %>% 
+  # mutate(days_calc_36525 = AgeAtDeath*365.25) %>% 
+  # mutate(calc_date_death3 = as.Date(date_of_birth) + (days_calc_36525))
   
 
 Vitals$AgeAtDeath_av2 <- as.integer(Vitals$AgeAtDeath_av)
