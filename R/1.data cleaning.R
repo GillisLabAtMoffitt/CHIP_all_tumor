@@ -10,64 +10,72 @@ path <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", "
                  "M2GEN")
 
 mrn1 <-
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/MRN.csv")) %>% 
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/MRN.csv"), na = c("PRBB-DO NOT USE")) %>% 
   filter(!is.na(MRN))
 mrn2 <-
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/MRN.csv")) %>% 
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/MRN.csv"), na = c("PRBB-DO NOT USE")) %>% 
   filter(!is.na(MRN))
 mrn <- bind_rows(mrn1, mrn2) %>% 
   distinct()
 rm(mrn1, mrn2)
 # myfiles = list.files(path = paste0(path,
-#   "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events"
+#   "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events"
 # ), pattern = "*.csv", full.names = TRUE)
 # 
 # clinical_v2 <- lapply(myfiles, read_csv)
 
 # myfiles <- list.files(path = paste0(path,
-#   "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events"
+#   "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events"
 # ), pattern = "*.csv", full.names = TRUE)
 # 
 # clinical_v4 <- lapply(myfiles, read_csv)
 # V2----
-Demo_v2 <- read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/Demographics.csv"))
+Demo_v2 <- read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/Demographics.csv"))
 Vitals_v2 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/DemographicsVitalStatusLastContact.csv"))
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/DemographicsVitalStatusLastContact.csv"))
 Medication_v2 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/Medications.csv"),
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/Medications.csv"),
            col_types = cols(AgeAtMedStart = col_character(),
+                            AgeAtMedStartFlag = col_character(),
+                            AgeAtMedStopFlag = col_character(),
                             AgeAtMedStop = col_character()))
 Radiation_v2 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/Radiation.csv"))
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/Radiation.csv"))
 Metastasis_v2 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/DiagnosisMetastaticDisease.csv")) %>% 
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/DiagnosisMetastaticDisease.csv")) %>% 
   select("AvatarKey", MetastaticDiseaseInd = "MetastaticDisease", 
          "MetastaticDiseaseSite", "MetastaticDiseaseSiteCode")
 Metastasis_v2_f <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/FollowUpDiagnosisMetastaticDisease.csv")) %>% 
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/FollowUpDiagnosisMetastaticDisease.csv")) %>% 
   select("AvatarKey", MetastaticDiseaseInd = "MetastaticDisease", 
          "MetastaticDiseaseSite", "MetastaticDiseaseSiteCode")
 Staging_v2 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/DiagnosisStaging.csv"))
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/DiagnosisStaging.csv"), na = c("Not Available"),
+           col_types = cols(AgeAtDiagnosisFlag = col_character(),
+                            # AgeAtMedStartFlag = col_character(),
+                            # AgeAtMedStopFlag = col_character(),
+                            AgeAtPerformanceStatusAtDiagnosisFlag = col_character()))
 Staging_v2_f <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/FollowUpDiagnosisStaging.csv"))
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/FollowUpDiagnosisStaging.csv"),
+           col_types = cols(YearOfDiagnosis = col_double()))
 Surgery_v2 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/SurgeryBiopsy.csv"),
-           col_types = cols(AgeAtSurgeryBiopsyFlag = col_character()))
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/SurgeryBiopsy.csv"),
+           col_types = cols(AgeAtSurgeryBiopsyFlag = col_character(),
+                            AgeAtSurgeryBiopsy = col_character()))
 TMarkers_v2 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/TumorMarkers.csv"),
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/TumorMarkers.csv"),
            col_types = cols(AgeAtTumorMarkerTestFlag = col_character()))
 Sequencing_v2 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/ClinicalSpecimen.csv")) %>% 
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/ClinicalSpecimen.csv")) %>% 
   select("AvatarKey", "ORIENSpecimenID", "WES", "AgeAtSpecimenCollection", "Tumor/Germline")
 
 Indicators_v2 <-
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/Indicators.csv")) %>% 
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/Indicators.csv")) %>% 
   select("AvatarKey", "COPDDiagnosisInd", "CVAStrokeDiagnosisInd", "InsulinDependentDiabetesMellitusDiagnosisInd", 
          "HypertensionDiagnosisInd", "MIHeartFailureDiagnosisInd", "VenousThrombosisDrugToxicityInd") %>% 
   distinct()
 Follow_indicators_v2 <-
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v2_clinical-with-events/FollowUpIndicators.csv")) %>% 
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v2_clinical-with-events/FollowUpIndicators.csv")) %>% 
   select("AvatarKey", "COPDDiagnosisInd", "CVAStrokeDiagnosisInd", "InsulinDependentDiabetesMellitusDiagnosisInd", 
          "HypertensionDiagnosisInd", "MIHeartFailureDiagnosisInd", "VenousThrombosisDrugToxicityInd") %>% 
   distinct()
@@ -75,31 +83,31 @@ colnames(Follow_indicators_v2)[2:ncol(Follow_indicators_v2)] <-
   paste("fw", colnames(Follow_indicators_v2)[2:ncol(Follow_indicators_v2)], sep = "_")
 
 # V4----
-Demo_v4 <- read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/PatientMaster.csv"))
+Demo_v4 <- read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/PatientMaster.csv"))
 Vitals_v4 <-
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/VitalStatus.csv"))
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/VitalStatus.csv"))
 Medication_v4 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/Medications.csv"))
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/Medications.csv"))
 Radiation_v4 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/Radiation.csv"))
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/Radiation.csv"))
 Metastasis_v4 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/MetastaticDisease.csv")) %>% 
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/MetastaticDisease.csv")) %>% 
   select("AvatarKey", "MetastaticDiseaseInd", 
          "MetastaticDiseaseSite", "MetastaticDiseaseSiteCode")
 Staging_v4 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/Diagnosis.csv"))
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/Diagnosis.csv"))
 Surgery_v4 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/SurgeryBiopsy.csv"))
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/SurgeryBiopsy.csv"))
 TMarkers_v4 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/TumorMarker.csv"))
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/TumorMarker.csv"))
 Sequencing_v4 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/ClinicalSpecimen.csv")) %>% 
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/ClinicalSpecimen.csv")) %>% 
   select("AvatarKey", "ORIENSpecimenID", "WES", "AgeAtSpecimenCollection", "Tumor/Germline")
 SCT_v4 <- 
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/StemCellTransplant.csv"))
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/StemCellTransplant.csv"))
 
 Indicators_v4 <-
-  read_csv(paste0(path, "/Garrick_raw data/10R20000134_2020-05-05_avatar_v4_clinical-with-events/PatientHistory.csv")) %>% 
+  read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/PatientHistory.csv")) %>% 
   select("AvatarKey", "SmokingStatus", "COPDDiagnosisInd", "CVAStrokeDiagnosisInd", "DVTDiagnosisInd",
          "HypercholesterolemiaDiagnosisInd", "HyperlipidemiaDiagnosisInd", 
          "InsulinDependentDiabetesMellitusDiagnosisInd", 
@@ -163,20 +171,36 @@ Demographics <- bind_rows(Demo_v2, Demo_v4) %>%  # has no duplicate
 
 # Vitals
 Vitals_v2$AvatarKey[which(duplicated(Vitals_v2$AvatarKey))]
-Vitals_v2 <- Vitals_v2 %>% ## PROBLEM : Found patient with 2 age at date, ex: A007107 ##
-  arrange(desc(VitalStatusConfirmed) , AgeAtDeath, EstAgeAtLastContact) %>% # Will keep the earliest date A016365
+
+## PROBLEM : Found patient with 2 age at date, ex: A007107 ##
+# Vitals_v2_test <- Vitals_v2 %>%
+#   group_by(AvatarKey) %>% 
+#   mutate(death_max = max(AgeAtDeath))
+# a <- Vitals_v2_test$AvatarKey[which(Vitals_v2_test$AgeAtDeath != Vitals_v2_test$death_max)]
+
+
+Vitals_v2 <- Vitals_v2 %>% 
+  arrange(desc(VitalStatus) , AvatarKey, desc(AgeAtLastContact)) %>% 
+  # arrange(desc(VitalStatusConfirmed) , AgeAtDeath, EstAgeAtLastContact) %>% # Will keep the earliest date A016365
   distinct(AvatarKey, .keep_all = TRUE) %>% 
   rename(AgeAtLastContact = "EstAgeAtLastContact")
 
 Vitals_v4$AvatarKey[which(duplicated(Vitals_v4$AvatarKey))]
+b <- paste0(Vitals_v4$AvatarKey[which(duplicated(Vitals_v4$AvatarKey))], collapse = "|")
+duplicate <- Vitals_v4[grepl(b, Vitals_v4$AvatarKey),]
 Vitals_v4 <- Vitals_v4 %>%
-  arrange(desc(VitalStatusConfirmed) , AgeAtDeath) %>% 
+  arrange(desc(VitalStatus) , AvatarKey, desc(AgeAtLastContact)) %>% 
   distinct(AvatarKey, .keep_all = TRUE)
 # Same problem
+# Vitals_v4_test <- Vitals_v4 %>%
+#   group_by(AvatarKey) %>% 
+#   mutate(death_max = max(AgeAtDeath))
+# a <- Vitals_v4_test$AvatarKey[which(Vitals_v4_test$AgeAtDeath != Vitals_v4_test$death_max)]
 
-# Do we have same id in v2 and v4 -> No, so good
-uid <- paste(unique(Vitals_v2$AvatarKey), collapse = "|")
-Vitals_v4 <- Vitals_v4[(!grepl(uid, Vitals_v4$AvatarKey)),]
+
+# Remove id from v4 in v2 -> Just to make sure
+uid <- paste(unique(Vitals_v4$AvatarKey), collapse = "|")
+Vitals_v2 <- Vitals_v2[(!grepl(uid, Vitals_v2$AvatarKey)),]
 # Bind
 Vitals <- bind_rows(Vitals_v2, Vitals_v4, .id = "version_vital") %>% 
   select(c("version_vital", "AvatarKey", "VitalStatus", "AgeAtDeath", "YearOfDeath", "CauseOfDeath", 
@@ -265,7 +289,7 @@ Metastasis <- dcast(setDT(metastasis), AvatarKey ~ rowid(AvatarKey),
 
 # Staging----
 Staging_v2 <- Staging_v2 %>% 
-  mutate(AgeAtPerformStatusMostRecent = case_when(# Will check for more cleaning----
+  mutate(AgeAtPerformStatusMostRecent = case_when(# Will check for more cleaning---- Pb with class(YearOfDiagnosis)
     AgeAtPerformStatusMostRecent == "Age 90 or Older" ~ 90,
     TRUE ~ as.numeric(AgeAtPerformStatusMostRecent)
     )) %>% 
