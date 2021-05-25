@@ -95,7 +95,11 @@ drug_tox_patients <- medication[(grepl(cardiotox_drugs, medication$Medication)),
   mutate(med_start_date = as.Date(date_of_birth) + ((AgeAtMedStart*365)+1)) %>% 
   mutate(med_stop_date = as.Date(date_of_birth) + ((AgeAtMedStop*365)+1)) %>% 
   select("AvatarKey", "MRN", "count_total_times_cardiotoxic_drug", "AgeAtMedStart","AgeAtMedStop", "Medication",  
-         med_start_date, med_stop_date, everything(), -version)
+         med_start_date, med_stop_date, everything(), -version) %>% 
+  left_join(., staging) %>% 
+  mutate(AgeAtDiagnosis = as.numeric(AgeAtDiagnosis)) %>% 
+  mutate(date_of_diagnosis = as.Date(date_of_birth) + ((AgeAtDiagnosis*365)+1)) %>% 
+  select(AvatarKey, MRN, date_of_diagnosis, everything())
 
 
 write_csv(drug_tox_patients, paste0(path, "/output data/Drugs/patients receiving cardiotoxic drugs with indicators.csv"))

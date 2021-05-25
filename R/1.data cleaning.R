@@ -305,7 +305,13 @@ Staging_v2 <- Staging_v2 %>%
 staging <- bind_rows(Staging_v2, Staging_v2_f, Staging_v4, .id = "version") %>%  # Need more cleaning for when followup
   select(-c(RecordKey, row_id)) %>% 
   arrange(AgeAtDiagnosis)
-
+staging <- bind_rows(Staging_v2 %>% select(AvatarKey, AgeAtDiagnosis), Staging_v4 %>% select(AvatarKey, AgeAtDiagnosis)) %>% 
+  distinct() %>% 
+  filter(!is.na(AgeAtDiagnosis)) %>% 
+  arrange(AvatarKey)
+  
+  
+  
 staging$AvatarKey[which(duplicated(staging$AvatarKey))]
 
 Staging <- dcast(setDT(staging), AvatarKey ~ rowid(AvatarKey),
