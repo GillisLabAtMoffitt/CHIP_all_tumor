@@ -117,21 +117,32 @@ Indicators_v4 <-
 cardiotox <- 
   readxl::read_xlsx(paste0(path, "/other data/Cardiotoxic drugs Jamila.xlsx"), na = "NA", n_max = 53)
 
-Age <- 
+demo <- 
   readxl::read_xlsx(paste0(path, "/Yifen data/Demographics_Report.xlsx")) %>% 
   mutate(date_of_death = case_when(
     `Vital Status` == "Dead"          ~ `Vital Status Date`, 
     TRUE                              ~ NA_POSIXct_)) %>% 
-  select(c("MRN", date_of_birth = `Date of Birth`, `Vital Status`, "date_of_death"))
+  select(c("MRN", date_of_birth = `Date of Birth`, vital_status = `Vital Status`, "date_of_death",
+           os_event_date = "Date of Last Contact or Death"))
 
 
-
+# Samples
 path1 <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", "CHIP in Avatar",
                   "Jamie")
 Clinical_linkage <- read.delim(paste0(path1, "/wes_somatic_mutations_metadata_v0.4.5.txt")) %>% 
-  select(c("subject", "ClinicalSpecimenLinkage_DiseaseType", "ClinicalSpecimenLinkage_AgeAtSpecimenCollection")) %>% 
-  arrange(ClinicalSpecimenLinkage_AgeAtSpecimenCollection) %>% 
-  distinct(subject, .keep_all = TRUE)
+  select(c("subject", SLID_germline, SLID_tumor, moffittSampleId, 
+           moffittSampleId_tumor, moffittSampleId_germline,
+           "ClinicalSpecimenLinkage_DiseaseType", "ClinicalSpecimenLinkage_AgeAtSpecimenCollection")) %>% 
+  arrange(subject, ClinicalSpecimenLinkage_AgeAtSpecimenCollection)
+
+sample_date <- 
+  readxl::read_xlsx(paste0(path, "/Yifen data/Avatar SLIDs and 06Sdates.xlsx"),
+                    na = "NULL")
+
+# Jamila
+cardiot_patients <- 
+  readxl::read_xlsx(paste0(path, "/Jamila Mammadova/data/Cardio events RFs_Jamila_v2.xlsx"),
+                    sheet = "Restructured_DCS", skip = 2, n_max = 150)
 
 ################################################################################################### II ### Data cleaning----
 # Cardiotoxicities
@@ -147,7 +158,11 @@ cardiotox <- cardiotox %>%
   # mutate(across(everything(), ~na_if(., "NA")))
 
 # Demographics----
-Demographics <- bind_rows(Demo_v2, Demo_v4) %>%  # has no duplicate
+demo <- 
+  full_join(mrn, demo, by = "MRN")
+Demographics <- 
+  bind_rows(Demo_v2, Demo_v4) %>%  # has no duplicate
+  left_join(demo, ., by = "AvatarKey") %>% 
   # mutate(AgeAtFirstContact = case_when(
   #   AgeAtFirstContact == "Age 90 or Older" ~ 90,
   #   TRUE ~ as.numeric(AgeAtFirstContact)
@@ -168,6 +183,38 @@ Demographics <- bind_rows(Demo_v2, Demo_v4) %>%  # has no duplicate
   )) %>% 
   mutate(Ethnicity = factor(Ethnicity, levels = c("Non-Spanish", "Spanish", "Unknown")))
   
+# WES
+Clinical_linkage1 <- full_join(sample_date, Clinical_linkage,
+                               by = c("subject", "SLID_germline", "SLID_tumor", "moffittSampleId", 
+                                      "moffittSampleId_tumor", "moffittSampleId_germline")) %>% 
+  left_join(., Demographics %>% select(AvatarKey, date_of_birth),
+                              by = c("subject" = "AvatarKey")) %>% 
+  mutate(ClinicalSpecimenLinkage_AgeAtSpecimenCollection = as.numeric(ClinicalSpecimenLinkage_AgeAtSpecimenCollection)) %>% 
+  mutate(days_calc_365 = ClinicalSpecimenLinkage_AgeAtSpecimenCollection * 365) %>% 
+  mutate(tunor_collection_dt = as.Date(date_of_birth) + (days_calc_365)) %>% 
+  mutate(tunor_collection_dt = coalesce(DateOfCollection_tumor, tunor_collection_dt)) %>% 
+  mutate(interval = abs(interval(start= DateOfCollection_germline, end= tunor_collection_dt)/duration(n=1, unit="days"))) %>% 
+  arrange(subject, interval) %>% 
+  distinct(subject, moffittSampleId_germline, .keep_all = TRUE)
+  
+Need to make sure that all the germline samples are from Blood
+
+
+
+
+
+
+We have to run CHIP analysis for her samples, so we need SLID germline and closest SLID tumor for each patient
+You may want to include the dates too, so we can know when they were collected relative to treatment
+Also include tumor type
+For all patient
+then Jamila subset
+
+
+
+
+
+
 
 # Vitals
 Vitals_v2$AvatarKey[which(duplicated(Vitals_v2$AvatarKey))]
@@ -180,7 +227,7 @@ Vitals_v2$AvatarKey[which(duplicated(Vitals_v2$AvatarKey))]
 
 
 Vitals_v2 <- Vitals_v2 %>% 
-  arrange(desc(VitalStatus) , AvatarKey, desc(AgeAtLastContact)) %>% 
+  arrange(desc(VitalStatus) , AvatarKey, desc(EstAgeAtLastContact)) %>% 
   # arrange(desc(VitalStatusConfirmed) , AgeAtDeath, EstAgeAtLastContact) %>% # Will keep the earliest date A016365
   distinct(AvatarKey, .keep_all = TRUE) %>% 
   rename(AgeAtLastContact = "EstAgeAtLastContact")
@@ -412,16 +459,9 @@ Global_data <- full_join(Sequencing, Demographics, by= "AvatarKey") %>% # Vitals
   full_join(., TMarkers, by= "AvatarKey") %>% 
   left_join(., Clinical_linkage %>% select(c("subject", "ClinicalSpecimenLinkage_DiseaseType")), by= c("AvatarKey" = "subject"))
 
+cardiot_patients <- left_join(mrn, Clinical_linkage, by = c("AvatarKey" = "subject")) %>% 
+  right_join(., cardiot_patients, by = "MRN")
 
 
 
-
-
-
-
-
-
-
-
-
-# End
+# End Cleaning

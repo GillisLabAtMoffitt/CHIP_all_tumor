@@ -1,4 +1,17 @@
 ####################################################################################################### I ### Clinical mining----
+tbl <- Clinical_linkage %>% 
+  distinct(subject, .keep_all = TRUE) %>%
+  select("ClinicalSpecimenLinkage_DiseaseType") %>% 
+  tbl_summary(
+    sort = list(everything() ~ "frequency")
+  ) %>% 
+  bold_labels() %>% as_gt()
+gt::gtsave(tbl, zoom = 1, paste0(path, "/output data/Demographic and clinical/cancer summary of overall WES data.pdf"))
+
+Clinical_linkage <- Clinical_linkage %>% 
+  select(c("subject", SLID_germline, SLID_tumor, moffittSampleId, 
+           moffittSampleId_tumor, moffittSampleId_germline))
+write_csv(Clinical_linkage, paste0(path1, "/list ids in Avatar.csv"))
 
 
 # Will need to mofy dataframe name later when everything is merge
@@ -159,7 +172,10 @@ x <- year_month_day(2019, 1, 1)
 
 add_years(x, 1:5)
 
+# SLID list for Jamila
 
+cardiot_patients <- cardiot_patients %>% 
+  
 
 
                                              
