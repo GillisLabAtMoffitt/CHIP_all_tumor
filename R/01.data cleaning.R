@@ -132,7 +132,8 @@ path1 <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", 
 Clinical_linkage <- read.delim(paste0(path1, "/wes_somatic_mutations_metadata_v0.4.5.txt")) %>% 
   select(c("subject", SLID_germline, SLID_tumor, moffittSampleId, 
            moffittSampleId_tumor, moffittSampleId_germline,
-           "ClinicalSpecimenLinkage_DiseaseType", "ClinicalSpecimenLinkage_AgeAtSpecimenCollection")) %>% 
+           "ClinicalSpecimenLinkage_AgeAtSpecimenCollection",
+           ClinicalSpecimenLinkage_HistologyBehavior, SpecimenDetail_DiseaseType)) %>% 
   arrange(subject, ClinicalSpecimenLinkage_AgeAtSpecimenCollection)
 
 sample_data <- 
@@ -213,8 +214,10 @@ Clinical_linkage <- full_join(sample_data, Clinical_linkage,
   select(-n, -is_tumor_closest_to_germline)
 
 # List samples for CHIP analysis closest tumor to germline for each patient
-write_csv(Clinical_linkage %>% 
-            select(subject, tumor_anatomic_site, 
+write_csv(Clinical_linkage %>% right_join(mrn, ., by = c("AvatarKey" = "subject")) %>% 
+            select(MRN, AvatarKey, 
+                   tumor_anatomic_site,
+                   ClinicalSpecimenLinkage_HistologyBehavior, SpecimenDetail_DiseaseType,
                    "SLID_germline", "moffittSampleId_germline", 
                    DateOfCollection_germline, 
                    "moffittSampleId", 
@@ -226,7 +229,9 @@ write_csv(Clinical_linkage %>%
 
 write_csv(cardiot_patients %>% left_join(., mrn, by = "MRN") %>% select(MRN, AvatarKey) %>% 
             left_join(., Clinical_linkage, by = c("AvatarKey" = "subject")) %>% 
-            select(MRN, AvatarKey, tumor_anatomic_site, 
+            select(MRN, AvatarKey, 
+                   tumor_anatomic_site,
+                   ClinicalSpecimenLinkage_HistologyBehavior, SpecimenDetail_DiseaseType,
                    "SLID_germline", "moffittSampleId_germline", 
                    DateOfCollection_germline, 
                    "moffittSampleId", 
