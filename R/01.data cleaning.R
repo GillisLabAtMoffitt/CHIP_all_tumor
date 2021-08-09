@@ -115,7 +115,7 @@ Indicators_v4 <-
          "PulmonaryEmbolismDiagnosisInd", "VenousThrombosisDrugToxicityInd")
 
 cardiotox <- 
-  readxl::read_xlsx(paste0(path, "/other data/Cardiotoxic drugs Jamila.xlsx"), na = "NA", n_max = 53)
+  readxl::read_xlsx(paste0(path, "/Jamila Mammadova/data/Cardiotoxic drugs Jamila.xlsx"), na = "NA", n_max = 53)
 
 demo <- 
   readxl::read_xlsx(paste0(path, "/Yifen data/Demographics_Report.xlsx")) %>% 
@@ -135,9 +135,11 @@ Clinical_linkage <- read.delim(paste0(path1, "/wes_somatic_mutations_metadata_v0
            "ClinicalSpecimenLinkage_DiseaseType", "ClinicalSpecimenLinkage_AgeAtSpecimenCollection")) %>% 
   arrange(subject, ClinicalSpecimenLinkage_AgeAtSpecimenCollection)
 
-sample_date <- 
-  readxl::read_xlsx(paste0(path, "/Yifen data/Avatar SLIDs and 06Sdates.xlsx"),
-                    na = "NULL")
+sample_data <- 
+  readxl::read_xlsx(paste0(path, "/Yifen data/Avatar SLIDs and 06Sdatesv2.xlsx"),
+                    na = "NULL") %>% 
+  select(-DateOfCollection,
+         tumor_anatomic_site = "tumor anatomic site", germline_anatomic_site = "germline anatomic site")
 
 # Jamila
 cardiot_patients <- 
@@ -174,7 +176,8 @@ Demographics <-
     str_detect(Race, "Unknown")                               ~ "Unknown",
     TRUE                                                      ~ Race
   )) %>% 
-  mutate(Race = factor(Race, levels = c("White", "Black", "Other", "Asian", "Unknown", "American Indian"))) %>% 
+  mutate(Race = factor(Race, 
+                       levels = c("White", "Black", "Other", "Asian", "Unknown", "American Indian"))) %>% 
   mutate(Ethnicity = case_when(
     Ethnicity %in% c("Non-Spanish; Non-Hispanic", "Spanish Surname Only")            ~ "Non-Spanish",
     str_detect(Ethnicity, "Mexican|Cuban|Domincian|Spanish|Puerto|American")         ~ "Spanish",
@@ -184,31 +187,55 @@ Demographics <-
   mutate(Ethnicity = factor(Ethnicity, levels = c("Non-Spanish", "Spanish", "Unknown")))
   
 # WES
-Clinical_linkage1 <- full_join(sample_date, Clinical_linkage,
-                               by = c("subject", "SLID_germline", "SLID_tumor", "moffittSampleId", 
-                                      "moffittSampleId_tumor", "moffittSampleId_germline")) %>% 
+Clinical_linkage <- full_join(sample_data, Clinical_linkage,
+                               by = c("subject", "SLID_germline", "SLID_tumor",
+                                        "moffittSampleId", "moffittSampleId_tumor", 
+                                        "moffittSampleId_germline")) %>% 
+  filter(germline_anatomic_site == "Blood") %>% 
   left_join(., Demographics %>% select(AvatarKey, date_of_birth),
                               by = c("subject" = "AvatarKey")) %>% 
+  # Calculate date of tumor collection when absent
   mutate(ClinicalSpecimenLinkage_AgeAtSpecimenCollection = as.numeric(ClinicalSpecimenLinkage_AgeAtSpecimenCollection)) %>% 
   mutate(days_calc_365 = ClinicalSpecimenLinkage_AgeAtSpecimenCollection * 365) %>% 
-  mutate(tunor_collection_dt = as.Date(date_of_birth) + (days_calc_365)) %>% 
-  mutate(tunor_collection_dt = coalesce(DateOfCollection_tumor, tunor_collection_dt)) %>% 
-  mutate(interval = abs(interval(start= DateOfCollection_germline, end= tunor_collection_dt)/duration(n=1, unit="days"))) %>% 
-  arrange(subject, interval) %>% 
-  distinct(subject, moffittSampleId_germline, .keep_all = TRUE)
-  
-Need to make sure that all the germline samples are from Blood
+  mutate(tunor_collection_dt = date_of_birth + days_calc_365) %>% 
+  mutate(tunor_collection_dt = coalesce(DateOfCollection_tumor, as.Date(tunor_collection_dt))) %>% 
+  mutate(interval_germ_tumor = abs(interval(start= DateOfCollection_germline, end= tunor_collection_dt)/duration(n=1, unit="days"))) %>% 
+  arrange(subject, interval_germ_tumor) %>% 
+  group_by(subject) %>% 
+  # distinct(subject, moffittSampleId_germline, .keep_all = TRUE)
+  mutate(n = row_number(subject)) %>% 
+  ungroup() %>% 
+  mutate(is_tumor_closest_to_germline = case_when(
+    n == 1       ~ "Yes",
+    TRUE         ~ "No"
+  )) %>% 
+  filter(is_tumor_closest_to_germline == "Yes") %>% 
+  select(-n, -is_tumor_closest_to_germline)
+
+# List samples for CHIP analysis closest tumor to germline for each patient
+write_csv(Clinical_linkage %>% 
+            select(subject, tumor_anatomic_site, 
+                   "SLID_germline", "moffittSampleId_germline", 
+                   DateOfCollection_germline, 
+                   "moffittSampleId", 
+                   "SLID_tumor", "moffittSampleId_tumor", 
+                   tunor_collection_dt,
+                   ClinicalSpecimenLinkage_AgeAtSpecimenCollection
+            ),
+          paste0(path, "/output data/cleaned files/Clinical_linkage with dates.csv"))
+
+write_csv(cardiot_patients %>% left_join(., mrn, by = "MRN") %>% select(MRN, AvatarKey) %>% 
+            left_join(., Clinical_linkage, by = c("AvatarKey" = "subject")) %>% 
+            select(MRN, AvatarKey, tumor_anatomic_site, 
+                   "SLID_germline", "moffittSampleId_germline", 
+                   DateOfCollection_germline, 
+                   "moffittSampleId", 
+                   "SLID_tumor", "moffittSampleId_tumor", 
+                   tunor_collection_dt,
+                   ClinicalSpecimenLinkage_AgeAtSpecimenCollection),
+          paste0(path, "/output data/cleaned files/Sample data tumor closest to germline Jamila patients.csv"))
 
 
-
-
-
-
-We have to run CHIP analysis for her samples, so we need SLID germline and closest SLID tumor for each patient
-You may want to include the dates too, so we can know when they were collected relative to treatment
-Also include tumor type
-For all patient
-then Jamila subset
 
 
 
