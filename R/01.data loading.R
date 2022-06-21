@@ -7,7 +7,10 @@ library(gtsummary)
 ################################################################################################### I ### load data----
 
 path <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", "CHIP in Avatar",
-                 "CH all tumor types", "M2GEN")
+                 "CH all tumor types", "raw data", "M2GEN")
+
+path3 <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", "CHIP in Avatar",
+                 "CH all tumor types")
 
 mrn1 <-
   read_csv(paste0(path, "/Data/10R20000463_2021-05-17_avatar_v2_clinical-with-events/MRN.csv"), na = c("PRBB-DO NOT USE")) %>% 
@@ -157,6 +160,60 @@ drugs_date <-
   rename(D_TX_IN_jamila = D_TX_IN)
   
 cardiot_patients <- cardiot_patients %>% full_join(., drugs_date, by = "MRN")
+
+
+
+
+
+
+
+################################################################################################### I ### v4.7----
+sample_data_v4_7 <- 
+  readxl::read_xlsx(paste0(path3, "/raw data/Clinical and sample Data Nancy v4_7/v4.6and4.7/10R22000048_20220616_outfile.xlsx"),
+                    sheet = "CDSC-AvatarMasterList_SDR-2 ",
+                    na = "NULL") %>% 
+  janitor::clean_names() %>% 
+  filter(str_detect(tumor_germline_heme_project_id, "germline")) %>% 
+  select(avatar_key = "orien_avatar_patient_id", "orien_specimen_id", "dna_sequencing_library_id",
+         "mrn", "sample_family_id", "tumor_germline_heme_project_id",
+         "specimen_site_of_collection", "date_of_specimen_collection")
+
+cardiotox <- 
+  readxl::read_xlsx(paste0(path, "/Jamila Mammadova/data/Cardiotoxic drugs Jamila.xlsx"), na = "NA", n_max = 53)
+
+Diagnosis_v4_7 <- 
+  readxl::read_xlsx(paste0(path3, "/raw data/Clinical and sample Data Nancy v4_7/v4.6and4.7/10R22000048_20220616_outfile.xlsx"),
+                    sheet = "20220504_MCC_Diagnosis_V4 ") %>% 
+  janitor::clean_names()
+Diagnosis_v4_7 <- Diagnosis_v4_7 %>% 
+  arrange(avatar_key, age_at_diagnosis) %>% 
+  group_by(avatar_key) %>% 
+  summarize_at(vars(age_at_diagnosis), str_c, collapse = "; ") %>% 
+  ungroup() %>% 
+  separate(age_at_diagnosis, into = paste("age_at_diagnosis_", 1:30, sep=""), sep = "; ", extra = "warn", 
+                      fill = "right") %>% 
+  purrr::keep(~!all(is.na(.))) %>% 
+  mutate(across(c(starts_with("age_at_diagnosis_")), 
+                ~ as.numeric(.)))
+
+Medication_v4_7 <- 
+  readxl::read_xlsx(paste0(path3, "/raw data/Clinical and sample Data Nancy v4_7/v4.6and4.7/10R22000048_20220616_outfile.xlsx"),
+                    sheet = "20220504_MCC_Medications_V4") %>% 
+  janitor::clean_names() %>% 
+  select("avatar_key", "medication", "med_line_regimen", "age_at_med_start",
+         "age_at_med_stop")
+
+previous_list <- 
+  read_csv(paste0(fs::path("","Volumes","Gillis_Research"), 
+                           "/Jamila Mammadova/patients receiving cardiotoxic drugs with indicators.csv")) %>% 
+  janitor::clean_names()
+previous_list <- paste0(previous_list$avatar_key, collapse = "|")
+
+previous_list1 <- 
+  read_csv(paste0(fs::path("","Volumes","Gillis_Research"), 
+                  "/Jamila Mammadova/List of new breast patients for Jamila 03012022.csv")) %>% 
+  janitor::clean_names() %>% 
+  mutate(mrn = as.character(mrn))
 
 
 # End Load
