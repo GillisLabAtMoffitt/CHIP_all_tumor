@@ -190,6 +190,7 @@ Diagnosis_v4_7 <-
                     sheet = "20220504_MCC_Diagnosis_V4 ") %>% 
   janitor::clean_names()
 Diagnosis_v4_7a <- Diagnosis_v4_7 %>% 
+  arrange(avatar_key, age_at_diagnosis) %>% 
   mutate(age_at_diagnosis = case_when(
     age_at_diagnosis == "Age 90 or older"            ~ 90,
     age_at_diagnosis == "Unknown/Not Applicable"     ~ NA_real_,
@@ -199,43 +200,49 @@ Diagnosis_v4_7a <- Diagnosis_v4_7 %>%
   # Add DOB  and date of diagnosis from sample tab
   full_join(., sample_data_v4_7_dates %>% 
               distinct(orien_avatar_patient_id, dob, .keep_all = TRUE),
-              select(orien_avatar_patient_id, date_of_diagnosis,
-                     # age_at_diagnosis,
-                     dob),
+              # select(orien_avatar_patient_id, date_of_diagnosis,
+              #        # age_at_diagnosis,
+              #        dob),
             by = c("avatar_key" = "orien_avatar_patient_id"),
-            suffix= c("_in_dx_tab", "_in_sample_tab")
+            suffix= c("", "_in_sample_tab")
             ) %>% 
-  # but need to bind correct age with correct age
-  # mutate(int_agedx_sampletab_dxtab = age_at_diagnosis_in_dx_tab - age_at_diagnosis_in_sample_tab) %>% 
-  # arrange(avatar_key, int_agedx_sampletab_dxtab) %>% 
-  # distinct(avatar_key, age_at_diagnosis_in_dx_tab, .kee) %>% 
-  # select(-age_at_diagnosis_in_sample_tab)
-  
   # Calculate date of tumor collection when absent
-  mutate(days_calc_365 = age_at_diagnosis_in_dx_tab * 365) %>%
-  mutate(date_of_diagnosis_calc = as.Date(dob) + (age_at_diagnosis_in_dx_tab * 365)) ###############################################
+  mutate(days_calc_365 = age_at_diagnosis * 365) %>%
+  mutate(date_of_diagnosis_calc = as.Date(dob) + (age_at_diagnosis * 365)) %>%
+  mutate(days_calc_36525 = age_at_diagnosis * 365.25) %>%
+  mutate(date_of_diagnosis_calc25 = as.Date(dob) + (age_at_diagnosis * 365.25)) %>% ###############################################
+
+mutate(date_of_diagnosis_dur = as.Date(dob) + duration(n=age_at_diagnosis, units = "years")) %>% ###############################################
+
+  select(avatar_key, age_at_diagnosis, date_of_diagnosis_calc,
+         date_of_diagnosis_calc25, date_of_diagnosis_dur,
+         date_of_diagnosis, age_at_diagnosis_in_sample_tab,
+         dob, date_of_specimen_collection, everything())
   
   
   # Create  var for the data of diagnosis of interest
   # It will be the first data of dx for all cancer and
   # the first of active MM diagnosis for MM
-  mutate(diagnosis_date_of_interest = case_when(
+  mutate(cancer_diagnosis_date = case_when(
     histology == "Multiple myeloma" &
       str_detect(hem_malig_phase, "Active Phase")          ~ date_of_diagnosis,
     histology != "Multiple myeloma"                        ~ date_of_diagnosis,
   )) %>% 
-  arrange(avatar_key, diagnosis_date_of_interest, age_at_diagnosis) %>% 
+  arrange(avatar_key, cancer_diagnosis_date, age_at_diagnosis) %>% 
   group_by(avatar_key) %>% 
-  fill(diagnosis_date_of_interest, .direction = "updown") %>% 
+  fill(cancer_diagnosis_date, .direction = "updown") %>% 
   
-  group_by(avatar_key, diagnosis_date_of_interest) %>% 
-  summarize_at(vars(age_at_diagnosis), str_c, collapse = "; ") %>% 
-  ungroup() %>% 
-  separate(age_at_diagnosis, into = paste("age_at_diagnosis_", 1:30, sep=""), sep = "; ", extra = "warn", 
+  group_by(avatar_key, cancer_diagnosis_date, primary_site, histology,
+           clin_group_stage) %>% 
+  summarize_at(vars(age_at_diagnosis, hem_malig_phase, age_at_other_staging_system, 
+                    other_staging_system, other_staging_value), 
+               str_c, collapse = "; ") %>% 
+  ungroup()
+  separate(hem_malig_phase, into = paste("hem_malig_phase", 1:30, sep=""), sep = "; ", extra = "warn", 
                       fill = "right") %>% 
   purrr::keep(~!all(is.na(.))) %>% 
-  mutate(across(c(starts_with("age_at_diagnosis_")), 
-                ~ as.numeric(.)))
+  # mutate(across(c(starts_with("age_at_diagnosis_")), 
+  #               ~ as.numeric(.)))
 
 Medication_v4_7 <- 
   readxl::read_xlsx(paste0(path3, "/raw data/Clinical and sample Data Nancy v4_7/v4.6and4.7/10R22000048_20220616_outfile.xlsx"),
