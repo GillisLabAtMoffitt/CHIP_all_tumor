@@ -217,7 +217,7 @@ mutate(date_of_diagnosis_dur = as.Date(dob) + duration(n=age_at_diagnosis, units
   select(avatar_key, age_at_diagnosis, date_of_diagnosis_calc,
          date_of_diagnosis_calc25, date_of_diagnosis_dur,
          date_of_diagnosis, age_at_diagnosis_in_sample_tab,
-         dob, date_of_specimen_collection, everything())
+         dob, date_of_specimen_collection, everything()) %>% 
   
   
   # Create  var for the data of diagnosis of interest
@@ -225,22 +225,25 @@ mutate(date_of_diagnosis_dur = as.Date(dob) + duration(n=age_at_diagnosis, units
   # the first of active MM diagnosis for MM
   mutate(cancer_diagnosis_date = case_when(
     histology == "Multiple myeloma" &
-      str_detect(hem_malig_phase, "Active Phase")          ~ date_of_diagnosis,
+      str_detect(hem_malig_phase, "Active Phase")          ~ date_of_diagnosis, # wrong thing to do but will see when dates are fixed
     histology != "Multiple myeloma"                        ~ date_of_diagnosis,
   )) %>% 
+  filter(!is.na(cancer_diagnosis_date)) %>% 
+  # Keep the first date of dx or MM dx and discard other dates for now
   arrange(avatar_key, cancer_diagnosis_date, age_at_diagnosis) %>% 
-  group_by(avatar_key) %>% 
-  fill(cancer_diagnosis_date, .direction = "updown") %>% 
-  
-  group_by(avatar_key, cancer_diagnosis_date, primary_site, histology,
-           clin_group_stage) %>% 
-  summarize_at(vars(age_at_diagnosis, hem_malig_phase, age_at_other_staging_system, 
-                    other_staging_system, other_staging_value), 
-               str_c, collapse = "; ") %>% 
-  ungroup()
-  separate(hem_malig_phase, into = paste("hem_malig_phase", 1:30, sep=""), sep = "; ", extra = "warn", 
-                      fill = "right") %>% 
-  purrr::keep(~!all(is.na(.))) %>% 
+  distinct(avatar_key, .keep_all = TRUE)
+  # group_by(avatar_key) %>% 
+  # fill(cancer_diagnosis_date, .direction = "updown") %>% 
+  # 
+  # group_by(avatar_key, cancer_diagnosis_date, primary_site, histology,
+  #          clin_group_stage) %>% 
+  # summarize_at(vars(age_at_diagnosis, hem_malig_phase, age_at_other_staging_system, 
+  #                   other_staging_system, other_staging_value), 
+  #              str_c, collapse = "; ") %>% 
+  # ungroup()
+  # separate(hem_malig_phase, into = paste("hem_malig_phase", 1:30, sep=""), sep = "; ", extra = "warn", 
+  #                     fill = "right") %>% 
+  # purrr::keep(~!all(is.na(.))) %>% 
   # mutate(across(c(starts_with("age_at_diagnosis_")), 
   #               ~ as.numeric(.)))
 
