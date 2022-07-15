@@ -169,10 +169,11 @@ cardiot_patients <- cardiot_patients %>% full_join(., drugs_date, by = "MRN")
 
 ################################################################################################### I ### v4.7----
 sample_data_v4_7_dates <- 
-  readxl::read_xlsx(paste0(path3, "/raw data/CDS/v4.6and4.7/10R22000169_20220624_outfile.xlsx"),
+  readxl::read_xlsx(paste0(path3, "/raw data/CDSC/v4.6and4.7/10R22000169_20220624_outfile.xlsx"),
                     sheet = "CDSC-AvatarMasterList_SDR-2 ",
                     na = "NULL") %>% 
-  janitor::clean_names()
+  janitor::clean_names() %>% 
+  mutate(mrn = as.character(mrn))
 
 sample_data_v4_7 <- sample_data_v4_7_dates %>%
   filter(str_detect(disease_type_conformed, "germline") &
@@ -186,7 +187,7 @@ cardiotox <-
   readxl::read_xlsx(paste0(path, "/Jamila Mammadova/data/Cardiotoxic drugs Jamila.xlsx"), na = "NA", n_max = 53)
 
 Diagnosis_v4_7 <- 
-  readxl::read_xlsx(paste0(path3, "/raw data/CDS/v4.6and4.7/10R22000169_20220624_outfile.xlsx"),
+  readxl::read_xlsx(paste0(path3, "/raw data/CDSC/v4.6and4.7/10R22000169_20220624_outfile.xlsx"),
                     sheet = "20220504_MCC_Diagnosis_V4 ") %>% 
   janitor::clean_names()
 Diagnosis_v4_7a <- Diagnosis_v4_7 %>% 
