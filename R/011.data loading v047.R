@@ -36,6 +36,27 @@ Vitals <-
   janitor::clean_names() %>% 
   select(avatar_key, vital_status, age_at_last_contact, age_at_death)
 
+Labs <- 
+  readxl::read_xlsx(paste0(path, "/raw data/CDSC/v4.6and4.7/10R22000169_20220624_outfile.xlsx"),
+                    sheet = "20220504_MCC_Labs_V4") %>% 
+  janitor::clean_names() %>% 
+  select(avatar_key, age_at_lab_results)
+Tum_seq <- 
+  readxl::read_xlsx(paste0(path, "/raw data/CDSC/v4.6and4.7/10R22000169_20220624_outfile.xlsx"),
+                    sheet = "20220504_MCC_TumorSequencing_V4") %>% 
+  janitor::clean_names() %>% 
+  select(avatar_key, age_at_tumor_sequencing)
+Tum_marker <- 
+  readxl::read_xlsx(paste0(path, "/raw data/CDSC/v4.6and4.7/10R22000169_20220624_outfile.xlsx"),
+                    sheet = "20220504_MCC_TumorMarker_V4") %>% 
+  janitor::clean_names() %>% 
+  select(avatar_key, age_at_tumor_marker_test)
+Surgery <- 
+  readxl::read_xlsx(paste0(path, "/raw data/CDSC/v4.6and4.7/10R22000169_20220624_outfile.xlsx"),
+                    sheet = "20220504_MCC_SurgeryBiopsy_V4") %>% 
+  janitor::clean_names() %>% 
+  select(avatar_key, age_at_surgery_biopsy)
+
 Diagnosis_v4_7 <- 
   readxl::read_xlsx(paste0(path, "/raw data/CDSC/v4.6and4.7/10R22000169_20220624_outfile.xlsx"),
                     sheet = "20220504_MCC_Diagnosis_V4 ") %>% 
@@ -61,18 +82,51 @@ Radiation <-
 SCT <- 
   readxl::read_xlsx(paste0(path, "/raw data/CDSC/v4.6and4.7/10R22000169_20220624_outfile.xlsx"),
                     sheet = "20220504_MCC_StemCellTransplant") %>% 
-  janitor::clean_names() %>% 
+  janitor::clean_names()
+
+CH_status <- 
+  readxl::read_xlsx(paste0(path, "/raw data/Nancy/Three cancer type pipeline results_YiHan_01.20.23_reviewed_modifcheck2.xlsx"),
+                    sheet = "all cancer type") %>% 
+  select(patient_id, CH_status = CH)
 
 
 ########################################################################################## II ### data cleaning----
+# Demographics
+Demographics <- Demographics %>% 
+  mutate(race = case_when(
+    race == "White"              ~ "White",
+    str_detect(race, "Unknown")  ~ NA_character_,
+    TRUE                         ~ "Others"
+  ), race = factor(race, levels = c("White", "Others"))) %>% 
+  mutate(ethnicity = case_when(
+    ethnicity == "Non-Spanish; Non-Hispanic"      ~ "Non-Hispanic",
+    str_detect(race, "Unknown")                   ~ NA_character_,
+    ethnicity == "Spanish surname only"           ~ "Non-Hispanic",
+    TRUE                                          ~ "Hispanic"
+  ), ethnicity = factor(ethnicity, levels = c("Non-Hispanic", "Hispanic")))
+
 # Diagnosis
 Diagnosis_v4_7 <- Diagnosis_v4_7 %>% 
   arrange(avatar_key, age_at_diagnosis) %>% 
-  distinct(avatar_key, .keep_all = TRUE)
-
+  distinct(avatar_key, .keep_all = TRUE) %>% 
+  mutate(across(.cols = c(starts_with("age_at")), ~as.numeric(.))) %>% 
+  mutate(stage = coalesce(clin_group_stage, other_staging_value),
+         stage = case_when(
+           str_detect(stage, "Unknown")           ~ NA_character_,
+           str_detect(stage, "No TNM")            ~ NA_character_,
+           str_detect(stage, "V|III")             ~ "III-IV",
+           str_detect(stage, "II")                ~ "II",
+           str_detect(stage, "I|0")               ~ "0-I"
+         ), stage = factor(stage, levels = c("0-I", "II", "III-IV")))
+  
 # Vitals
 Vitals <- Vitals %>% 
-mutate(across(.cols = c(starts_with("age_at")), ~as.numeric(.)))
+  mutate(across(.cols = c(starts_with("age_at")), ~as.numeric(.))) %>% 
+  mutate(vital_status2 = case_when(
+    vital_status == "Dead"                        ~ "Dead",
+    is.na(vital_status)                           ~ "Alive",
+    vital_status == "Lost to follow-up"           ~ "Alive"
+  ))
 
 # Drugs
 medication_v4_7 <- Medication_v4_7 %>% 
@@ -150,21 +204,46 @@ SCT <- sct %>%
   mutate(across(.cols = c(starts_with("age_at")), ~as.numeric(.))) %>% 
   mutate(sct_ever = "Yes")
 
+# Lost of contact
+Lost_contact <- bind_rows(Tum_seq %>% rename(last_age = age_at_tumor_sequencing),
+                          Tum_marker %>% rename(last_age = age_at_tumor_marker_test),
+                          Surgery %>% rename(last_age = age_at_surgery_biopsy)) %>% 
+  mutate_at("last_age", ~as.numeric(.)) %>% 
+  bind_rows(Diagnosis_v4_7 %>% rename(last_age = age_at_diagnosis),
+            medication_v4_7 %>% rename(last_age = age_at_med_start),
+            medication_v4_7 %>% rename(last_age = age_at_med_stop),
+            radiation %>% rename(last_age = age_at_radiation_start),
+            radiation %>% rename(last_age = age_at_radiation_stop),
+            sct %>% rename(last_age = age_at_transplant)) %>% 
+  select(avatar_key, last_age) %>% 
+  arrange(avatar_key, desc(last_age)) %>% 
+  distinct(avatar_key, .keep_all = TRUE)
+
 # Outcome for progression
 # Patient history for tobacco, alcohol ...
 
+CH_status <- CH_status %>% 
+  mutate(patient_id = str_remove(patient_id, "_normal")) %>% 
+  mutate(CH_status = case_when(
+    CH_status == "CH"          ~ "CH",
+    CH_status == "NO"          ~ "No CH",
+    TRUE                       ~ CH_status
+  ), CH_status = factor(CH_status, levels = c("No CH", "CH"))) %>% 
+  arrange(patient_id, desc(CH_status)) %>% 
+  distinct(patient_id, .keep_all = TRUE)
+
+
+
 ########################################################################################## III ### merge----
 Global_data <- full_join(Germline, Vitals, by = "avatar_key") %>% 
+  full_join(., Demographics, by = "avatar_key") %>% 
   full_join(., Diagnosis_v4_7, by = "avatar_key") %>% 
   full_join(., Medication_v4_7, by = "avatar_key") %>% 
   full_join(., Radiation, by = "avatar_key") %>% 
-  full_join(., SCT, by = "avatar_key")
+  full_join(., SCT, by = "avatar_key") %>% 
+  full_join(., Lost_contact, by = "avatar_key") %>% 
+  full_join(., CH_status, by = c("Germline_SLID" = "patient_id"))
 write_rds(Global_data, "Global_data.rds")
 
-germline_data <- Global_data %>% 
-  filter(!is.na(Germline_SLID))
-write_rds(germline_data, "germline_data.rds")
 
-
-## END
-
+## END Cleaning
