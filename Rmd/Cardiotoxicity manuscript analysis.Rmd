@@ -1,0 +1,185 @@
+---
+title: "Cardiotoxicity analysis"
+author: "Christelle Colin-Leitzinger"
+date: '`r Sys.Date()`'
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: false
+    theme: united
+    highlight: pygments
+    df_print: kable
+editor_options: 
+  chunk_output_type: console
+---
+
+<style type="text/css">
+
+.figure {
+    margin-top: 100px;
+    margin-bottom: 100px;
+}
+
+table {
+    margin-top: 10px;
+    margin-bottom: 25px !important;
+}
+
+th, td { padding: 5px; }
+
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE,
+                      cache = FALSE,
+                      fig.align='center'
+                      )
+```
+
+```{r library}
+library(tidyverse)
+library(gtsummary)
+library(survival)
+theme_gtsummary_compact()
+```
+
+```{r}
+card_data <- 
+  readxl::read_xlsx(paste0(here::here(), "/Diep_100_calls__.xlsx"),
+                    sheet = "Dox Subpopulation", n_max = 100) %>% 
+  janitor::clean_names()
+
+card_data <- card_data %>% 
+  mutate(cardtox = case_when(
+    cardtox == 1          ~ "Cardiotoxicity",
+    cardtox == 3          ~ "No Cardiotoxicity"
+  ), cardtox = factor(cardtox, levels = c("No Cardiotoxicity", "Cardiotoxicity"))
+  ) %>% 
+  mutate(vitals = case_when(
+    vital == 1            ~ 1,
+    vital == 2            ~ 0
+  )) %>% 
+  mutate(race = case_when(
+    race == 1            ~ "White",
+    race == 2            ~ "Others"
+  )) %>% 
+  mutate(gender = case_when(
+    gender == 1            ~ "Male",
+    gender == 2            ~ "Female"
+  ), gender = factor(gender, levels = c("Male", "Female"))
+  ) %>% 
+  mutate(october_22_chip = case_when(
+    october_22_chip == 1            ~ "CH",
+    october_22_chip == 2            ~ "No CH"
+  ), october_22_chip = factor(october_22_chip, levels = c("No CH", "CH"))
+  ) %>% 
+  mutate(c_type = case_when(
+    c_type == 1                     ~ "breast",
+    c_type == 2                     ~ "blood",
+    c_type == 3                     ~ "ovarian",
+    c_type == 4                     ~ "sarcoma",
+    c_type == 5                     ~ "other"
+  )) %>% 
+  mutate(c_type_breast_vs_others = case_when(
+    c_type == "breast"              ~ "breast",
+    c_type == "blood"               ~ "others",
+    c_type == "ovarian"             ~ "others",
+    c_type == "sarcoma"             ~ "others",
+    c_type == "other"               ~ "others",
+  ), c_type_breast_vs_others = factor(c_type_breast_vs_others, levels = c("others", "breast"))) %>% 
+  mutate(hormone_tx = case_when(
+    hormone_tx == 1            ~ "Yes",
+    hormone_tx == 2            ~ "No"
+  ), hormone_tx = factor(hormone_tx, levels = c("No", "Yes"))
+  ) %>% 
+  mutate(radio_heart = case_when(
+    radio_heart == 1            ~ "Yes",
+    radio_heart == 2            ~ "No"
+  ), radio_heart = factor(radio_heart, levels = c("No", "Yes"))
+  ) %>% 
+  
+  mutate(hx_dm = case_when(
+    hx_dm == 1            ~ "Yes",
+    hx_dm == 2            ~ "No"
+  ), hx_dm = factor(hx_dm, levels = c("No", "Yes"))
+  ) %>% 
+  mutate(hx_hld = case_when(
+    hx_hld == 1            ~ "Yes",
+    hx_hld == 2            ~ "No"
+  ), hx_hld = factor(hx_hld, levels = c("No", "Yes"))
+  ) %>% 
+  mutate(hx_smk = case_when(
+    hx_smk == 1            ~ "Yes",
+    hx_smk == 3            ~ "Never"
+  ), hx_smk = factor(hx_smk, levels = c("Never", "Yes"))
+  )
+
+```
+
+# Summary table
+```{r}
+card_data %>% 
+  select(race, gender, october_22_chip,
+         c_type, c_type_breast_vs_others,
+         hormone_tx, radio_heart,
+         cardtox,
+         hx_dm, hx_hld, hx_smk) %>% 
+  tbl_summary(type = list(c(hormone_tx, radio_heart,
+                            hx_dm, hx_hld) ~ "categorical")
+  )
+```
+
+
+# Linear regression
+```{r}
+glm(cardtox ~
+      age_ctox_in + ctox_ag_cum_dose + gender + october_22_chip + hx_dm + hx_hld + hx_smk + race,
+    data = card_data,
+    family = "binomial"
+) %>%
+  tbl_regression(exponentiate = TRUE,
+                 intercept = TRUE,
+                 add_estimate_to_reference_rows = TRUE)
+```
+
+```{r}
+card_data <- card_data %>% 
+  mutate(gender = factor(gender, levels = c("Female", "Male")))
+
+glm(cardtox ~
+      age_ctox_in + ctox_ag_cum_dose + gender + october_22_chip + hx_dm + hx_hld + hx_smk + race,
+    data = card_data,
+    family = "binomial"
+) %>%
+  tbl_regression(exponentiate = TRUE,
+                 intercept = TRUE,
+                 add_estimate_to_reference_rows = TRUE)
+```
+
+# Survival analysis
+```{r}
+tbl1 <- card_data %>% select(vitals, surv_time,
+                             c_type_breast_vs_others, hormone_tx, radio_heart) %>%
+  tbl_uvregression(method = survival::coxph,
+                   y = (Surv(time = card_data$surv_time,
+                             event = card_data$vitals)),
+                   exponentiate = TRUE) %>% 
+  bold_labels() %>% italicize_levels() %>% 
+  bold_p(t = .05) %>% add_nevent(location = "level") %>% add_n(location = "level")
+tbl2 <-
+  coxph(Surv(time = card_data$surv_time,
+             event = card_data$vitals) ~ 
+          c_type_breast_vs_others + hormone_tx + radio_heart,
+        data =  card_data) %>%
+  tbl_regression(exponentiate = TRUE) %>% bold_p(t = .05) %>% 
+  add_nevent(location = "level") %>% add_n(location = "level")
+tbl_merge(list(tbl1, tbl2), tab_spanner = c("**Univariable**", "**Multivariable**"))
+```
+
+
+
+
+
