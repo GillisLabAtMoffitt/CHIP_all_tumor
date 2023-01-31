@@ -46,6 +46,9 @@ library(survival)
 theme_gtsummary_compact()
 ```
 
+I created a new column `doxo_dose_categories` with 2 categories:  
+- if ctox_ag_cum_dose strictly > 240, the categorie is named `> 240mg/m2`  
+- if ctox_ag_cum_dose <= 240, the categorie is named `≤ 240mg/m2`  
 ```{r}
 card_data <- 
   readxl::read_xlsx(paste0(here::here(), "/Diep_100_calls__.xlsx"),
@@ -115,6 +118,11 @@ card_data <- card_data %>%
     hx_smk == 1            ~ "Yes",
     hx_smk == 3            ~ "Never"
   ), hx_smk = factor(hx_smk, levels = c("Never", "Yes"))
+  ) %>% 
+  mutate(doxo_dose_categories = case_when(
+    ctox_ag_cum_dose > 240            ~ "> 240mg/m2",
+    ctox_ag_cum_dose <= 240           ~ "≤ 240mg/m2"
+  ), doxo_dose_categories = factor(doxo_dose_categories, levels = c("≤ 240mg/m2", "> 240mg/m2"))
   )
 
 ```
@@ -126,14 +134,14 @@ card_data %>%
          c_type, c_type_breast_vs_others,
          hormone_tx, radio_heart,
          cardtox,
-         hx_dm, hx_hld, hx_smk) %>% 
+         hx_dm, hx_hld, hx_smk, doxo_dose_categories) %>% 
   tbl_summary(type = list(c(hormone_tx, radio_heart,
                             hx_dm, hx_hld) ~ "categorical")
   )
 ```
 
 
-# Linear regression
+# Regression
 ```{r}
 glm(cardtox ~
       age_ctox_in + ctox_ag_cum_dose + gender + october_22_chip + hx_dm + hx_hld + hx_smk + race,
@@ -180,6 +188,18 @@ tbl_merge(list(tbl1, tbl2), tab_spanner = c("**Univariable**", "**Multivariable*
 ```
 
 
+
+# Regression USING `doxo_dose_categories`
+```{r}
+glm(cardtox ~
+      age_ctox_in + doxo_dose_categories + gender + october_22_chip + hx_dm + hx_hld + hx_smk + race,
+    data = card_data,
+    family = "binomial"
+) %>%
+  tbl_regression(exponentiate = TRUE,
+                 intercept = TRUE,
+                 add_estimate_to_reference_rows = TRUE)
+```
 
 
 
