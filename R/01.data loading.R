@@ -32,7 +32,8 @@ rm(mrn1, mrn2)
 # ), pattern = "*.csv", full.names = TRUE)
 # 
 # clinical_v4 <- lapply(myfiles, read_csv)
-# V2----
+
+# V2---- March 2020
 Demo_v2 <- read_csv(paste0(path, "/Data/10R20000463_2021-05-17_avatar_v2_clinical-with-events/Demographics.csv"))
 Vitals_v2 <- 
   read_csv(paste0(path, "/Data/10R20000463_2021-05-17_avatar_v2_clinical-with-events/DemographicsVitalStatusLastContact.csv"))
@@ -85,7 +86,7 @@ Follow_indicators_v2 <-
 colnames(Follow_indicators_v2)[2:ncol(Follow_indicators_v2)] <- 
   paste("fw", colnames(Follow_indicators_v2)[2:ncol(Follow_indicators_v2)], sep = "_")
 
-# V4----
+# V4---- March 2020
 Demo_v4 <- read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/PatientMaster.csv"))
 Vitals_v4 <-
   read_csv(paste0(path, "/Data/10R20000463_2021-05-10_avatar_v4_clinical-with-events/VitalStatus.csv"))
@@ -117,31 +118,39 @@ Indicators_v4 <-
          "HypertensionDiagnosisInd", "HeartDiseaseDiagnosisInd", "MIHeartFailureDiagnosisInd",
          "PulmonaryEmbolismDiagnosisInd", "VenousThrombosisDrugToxicityInd")
 
-# Demo with date
+################################################################################################### Updated data
+# Demo with date April 2021 Yifen----
+# 1 more patient than in Garrick's V2 but V2 has 12 more patients than Yifen's
+# Same for V4
+# V2 and V4 have 1937 patients in common
 demo <- 
   readxl::read_xlsx(paste0(path, "/Yifen data/Demographics_Report.xlsx")) %>% 
+  janitor::clean_names() %>% 
   mutate(date_of_death = case_when(
-    `Vital Status` == "Dead"          ~ `Vital Status Date`, 
+    vital_status == "Dead"            ~ vital_status_date, 
     TRUE                              ~ NA_POSIXct_)) %>% 
-  select(c("MRN", date_of_birth = `Date of Birth`, vital_status = `Vital Status`, "date_of_death",
-           os_event_date = "Date of Last Contact or Death"))
+  select(c(mrn, date_of_birth, vital_status, date_of_death,
+           date_of_last_contact_or_death, gender_cancer_registry,
+           race_cancer_registry_1, ethnicity_cancer_registry))
 
-# Samples
+################################################################################################### WES
+# Germline + tumor samples all tumor type v04.5
 path1 <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", "CHIP in Avatar",
-                  "Jamie")
+                  "MM avatar", "Jamie")
 Clinical_linkage <- read.delim(paste0(path1, "/wes_somatic_mutations_metadata_v0.4.5.txt")) %>% 
   select(c("subject", SLID_germline, SLID_tumor, moffittSampleId, 
            moffittSampleId_tumor, moffittSampleId_germline,
            "ClinicalSpecimenLinkage_AgeAtSpecimenCollection",
            ClinicalSpecimenLinkage_HistologyBehavior, SpecimenDetail_DiseaseType)) %>% 
   arrange(subject, ClinicalSpecimenLinkage_AgeAtSpecimenCollection)
-# Samples dates and Ids
+# Samples dates and Ids for v04.5
 sample_data <- 
   readxl::read_xlsx(paste0(path, "/Yifen data/Avatar SLIDs and 06Sdatesv2.xlsx"),
                     na = "NULL") %>% 
   select(-DateOfCollection,
          tumor_anatomic_site = "tumor anatomic site", germline_anatomic_site = "germline anatomic site")
 
+################################################################################################### Cardiotox
 # Jamila
 # Cardiotoxic drugs and their manifestations
 cardiotox <- 
@@ -167,7 +176,7 @@ cardiot_patients <- cardiot_patients %>% full_join(., drugs_date, by = "MRN")
 
 
 
-################################################################################################### I ### v4.7----
+################################################################################################### I ### v4.6 + v4.7----
 sample_data_v4_7_dates <- 
   readxl::read_xlsx(paste0(path3, "/raw data/CDSC/v4.6and4.7/10R22000169_20220624_outfile.xlsx"),
                     sheet = "CDSC-AvatarMasterList_SDR-2 ",

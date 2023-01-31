@@ -1,4 +1,62 @@
-################################################################################################### II ### Data cleaning----
+################################################################################################### I ### With updated data----
+# Demographics----
+demo <- 
+  full_join(mrn, demo, by = "MRN")
+Demo_v2 <- Demo_v2 %>% 
+  drop_na(all_of(c("RecordKey" , "row_id")))
+Demo_v4 <- Demo_v4 %>% 
+  drop_na(all_of(c("AgeAtClinicalRecordCreation", "row_id")))
+
+Demographics <- Demo_v4 %>% 
+  # V2 and V4 have no duplicate and 
+  # no patients in common when NA removed
+  bind_rows(.,  Demo_v2 %>% 
+              rename(AgeAtClinicalRecordCreation = AgeAtFirstContact,
+                     YearOfClinicalRecordCreation = AgeAtFirstContactFlag)
+            ) %>% 
+  # Add dates for back calculation
+  # 7 patients are absent from Yifen's data vs Garrick's
+  left_join(demo, ., by = c("mrn" = "MRN"))
+
+
+# WES----
+# v4.7
+Germline_v4.7 <- sample_data_v4_7_dates %>% 
+  filter(str_detect(disease_type_conformed, "germline") &
+           specimen_site_of_collection == "Blood") %>%
+  mutate(germline_collection_date = date_of_specimen_collection) %>% 
+  select(avatar_key = "orien_avatar_patient_id", mrn, 
+         germline_orien_id = orien_specimen_id, 
+         SLID_germline = dna_sequencing_library_id,
+         germline_sample_family_id = sample_family_id,
+         germline_site_of_collection = specimen_site_of_collection, 
+         germline_collection_date,
+         date_of_specimen_collection,
+         dob)
+
+Tumor_v4.7 <- sample_data_v4_7_dates %>% 
+  filter(!str_detect(disease_type_conformed, "germline")) %>%
+  mutate(tumor_collection_date = date_of_specimen_collection) %>% 
+  select(avatar_key = "orien_avatar_patient_id", mrn, 
+         tumor_orien_id = orien_specimen_id, 
+         dna_sequencing_library_id, rna_sequencing_library_id,
+         tumor_sample_family_id = sample_family_id,
+         tumor_site_of_collection = specimen_site_of_collection, 
+         tumor_collection_date,
+         date_of_specimen_collection,
+         disease_type_conformed, histology, release,
+         dob, date_of_diagnosis, age_at_diagnosis)
+
+WES_v4.7 <- full_join(Germline_v4.7, Tumor_v4.7, 
+                      by = c("avatar_key", "mrn", "dob")) %>% 
+  mutate
+
+path3 <- fs::path("","Volumes","Gillis_Research","Christelle Colin-Leitzinger", "CHIP in Avatar",
+                  "CH all tumor types")
+write_csv(WES_v4.7, paste0(path3, "/processed WES ids list/matched germline tumor sample ids all tumor type v04.7.csv"))
+
+################################################################################################### II ### With older data----
+
 # Cardiotoxicities
 cardiotox <- cardiotox %>% 
   `colnames<-`(str_replace_all(colnames(.), " ", "_")) %>% 
