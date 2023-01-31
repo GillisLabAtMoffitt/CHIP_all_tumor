@@ -201,5 +201,16 @@ glm(cardtox ~
                  add_estimate_to_reference_rows = TRUE)
 ```
 
+# Univariable
+```{r}
+glm(cardtox ~
+      doxo_dose_categories,
+    data = card_data,
+    family = "binomial"
+) %>%
+  tbl_regression(exponentiate = TRUE,
+                 intercept = TRUE,
+                 add_estimate_to_reference_rows = TRUE)
+```
 
 
