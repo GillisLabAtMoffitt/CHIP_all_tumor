@@ -422,6 +422,12 @@ germline_data1 <- bind_rows(germline_data %>%
                               ),
                             germline_data_MM %>% 
                               mutate(disease_type_conformed = "MM"))
+write_csv(germline_data1 %>% 
+            select(avatar_key, disease_type_conformed,
+                   CH_status,
+                   month_at_os, os_event,
+                   month_at_progression_drug, drug_progression_event),
+          "survival data for R01 multiple cancers.csv")
 ```
 
 ## Overall
