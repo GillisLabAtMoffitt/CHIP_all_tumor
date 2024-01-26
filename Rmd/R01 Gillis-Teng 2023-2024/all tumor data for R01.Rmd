@@ -30,21 +30,23 @@ theme_set(theme_classic())
 
 ```{r load}
 path <- fs::path("", "Volumes", "Lab_Gillis","ORIEN_Avatar", "resources")
+# 
+# clinical_mol_linkage <-
+#   read.csv(paste0(path, "/23PRJ127MCC_NormalizedFiles/23PRJ127MCC_20230620_ClinicalMolLinkage_V4.csv"), na.strings = "")
+# 
+# 
+# filenames <- list.files(path = paste0(path, "/23PRJ127MCC_NormalizedFiles"),
+#                         pattern = "23PRJ127MCC_20230620_.*.csv")
+# names <- str_match(filenames, "23PRJ127MCC_20230620_(.*)_V4.csv")[,2]
+# 
+# for(i in names){
+#     filepath <- file.path(paste0(path, "/23PRJ127MCC_NormalizedFiles/",paste("23PRJ127MCC_20230620_", i, "_V4.csv",sep="")))
+#     assign(i, read.csv(filepath, na.strings = ""))
+# }
+# 
+# rm(filenames, names, filepath, i)
 
-clinical_mol_linkage <-
-  read.csv(paste0(path, "/23PRJ127MCC_NormalizedFiles/23PRJ127MCC_20230620_ClinicalMolLinkage_V4.csv"), na.strings = "")
-
-
-filenames <- list.files(path = paste0(path, "/23PRJ127MCC_NormalizedFiles"),
-                        pattern = "23PRJ127MCC_20230620_.*.csv")
-names <- str_match(filenames, "23PRJ127MCC_20230620_(.*)_V4.csv")[,2]
-
-for(i in names){
-    filepath <- file.path(paste0(path, "/23PRJ127MCC_NormalizedFiles/",paste("23PRJ127MCC_20230620_", i, "_V4.csv",sep="")))
-    assign(i, read.csv(filepath, na.strings = ""))
-}
-
-rm(filenames, names, filepath, i)
+load("~/Documents/GitHub/Gillis/CHIP_all_tumor/Rmd/R01 Gillis-Teng 2023-2024/initial_files.RData")
 ```
 
 ```{r cytogenetics cleaning}
@@ -97,7 +99,7 @@ rm(PatientMaster)
 Diagnosis :
 - Do we want to include only patients who are seen for a primary diagnosis?   
 - I only included the first diagnosis
-```{r}
+```{r Diagnosis}
 Diagnosis <- Diagnosis %>% 
   select(AvatarKey, AgeAtDiagnosis, YearOfDiagnosis,
          PrimaryDiagnosisSiteCode : Histology,
@@ -120,14 +122,272 @@ Diagnosis <- Diagnosis %>%
 #       value.var = c("Medication")) 
 ```
 
-```{r}
+```{r vitals}
+VitalStatus <- VitalStatus %>% 
+  select(AvatarKey, VitalStatus, AgeAtLastContact, AgeAtDeath) %>% 
+  mutate(across(c("AgeAtLastContact", "AgeAtDeath"), ~ case_when(
+    . == "Age 90 or older"                ~ 90,
+    . == "Unknown/Not Applicable"         ~ NA_real_,
+    TRUE                             ~ as.numeric(.)
+  )))
+```
+
+```{r outcomes}
+Outcomes1 <- Outcomes %>% 
+  inner_join(., Diagnosis %>% 
+               select(AvatarKey, PrimaryDiagnosisSiteCode, PrimaryDiagnosisSite), 
+             by = c("AvatarKey", "OutcomesPrimaryDiagnosisSiteCode" = "PrimaryDiagnosisSiteCode",
+                    "OutcomesPrimaryDiagnosisSite" = "PrimaryDiagnosisSite")) %>% 
+  arrange(AvatarKey, AgeAtProgRecur) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
+
+Outcomes2 <- Outcomes %>% 
+  # For the patients with no diagnosis site
+  filter(OutcomesPrimaryDiagnosisSite == "Unknown/Not Applicable") %>% 
+  arrange(AvatarKey, AgeAtProgRecur) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
+
+Outcomes <- Outcomes1 %>% 
+  # bind the data with a primary site known as first diagnosis
+  # then the one without which show some No Metastasis
+  bind_rows(., Outcomes2) %>% 
+  select(AvatarKey, OutcomesPrimaryDiagnosisSiteCode, OutcomesPrimaryDiagnosisSite,
+         ProgRecurInd, AgeAtProgRecur, RelapseStatus) %>% 
+  mutate(across(c("AgeAtProgRecur"), ~ case_when(
+    . == "Age 90 or older"                ~ 90,
+    . == "Unknown/Not Applicable"         ~ NA_real_,
+    TRUE                                  ~ as.numeric(.)
+  ))) %>% 
+  distinct(AvatarKey, .keep_all = TRUE) %>% 
+  mutate(has_outcomes_data = "Yes")
+
+rm(MetastaticDisease1, MetastaticDisease2)
+```
+
+```{r metastasis}
+MetastaticDisease1 <- MetastaticDisease %>% 
+  # For the patient with a diagnosis site
+  inner_join(., Diagnosis %>% 
+               select(AvatarKey, PrimaryDiagnosisSiteCode, PrimaryDiagnosisSite), 
+             by = c("AvatarKey", "MetastaticDiseaseSiteCode" = "PrimaryDiagnosisSiteCode",
+                    "MetastaticDiseaseSite" = "PrimaryDiagnosisSite")) %>% 
+  arrange(AvatarKey, AgeAtMetastaticSite) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
+
+MetastaticDisease2 <- MetastaticDisease %>% 
+  # For the patients with no diagnosis site
+  filter(MetastaticDiseaseSite == "Unknown/Not Applicable") %>% 
+  arrange(AvatarKey, AgeAtMetastaticSite) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
+
+MetastaticDisease <- MetastaticDisease1 %>% 
+  # bind the data with a primary site known as first diagnosis
+  # then the one without which show some No Metastasis
+  bind_rows(., MetastaticDisease2) %>% 
+  select(AvatarKey, MetastaticDiseaseSiteCode, MetastaticDiseaseSite,
+         had_metastasis = MetastaticDiseaseInd, AgeAtMetastaticSite, MetsDzPrimaryDiagnosisSite) %>% 
+  mutate(across(c("AgeAtMetastaticSite"), ~ case_when(
+    . == "Age 90 or older"                ~ 90,
+    . == "Unknown/Not Applicable"         ~ NA_real_,
+    TRUE                                  ~ as.numeric(.)
+  ))) %>% 
+  distinct(AvatarKey, .keep_all = TRUE) %>% 
+  mutate(has_metastasis_data = "Yes")
+
+rm(MetastaticDisease1, MetastaticDisease2)
+```
+
+```{r medication}
+Medications <- Medications %>% 
+  filter(MedicationInd != "(Migrated) Cannot determine from available documentation")
+
+Medications1 <- Medications %>% 
+  # For the patient with a diagnosis site
+  inner_join(., Diagnosis %>% 
+               select(AvatarKey, PrimaryDiagnosisSiteCode, PrimaryDiagnosisSite), 
+             by = c("AvatarKey", "MedPrimaryDiagnosisSiteCode" = "PrimaryDiagnosisSiteCode",
+                    "MedPrimaryDiagnosisSite" = "PrimaryDiagnosisSite")) %>% 
+  arrange(AvatarKey, AgeAtMedStart) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
+
+Medications2 <- Medications %>% 
+  # For the patients with no diagnosis site
+  filter(MedPrimaryDiagnosisSite == "Unknown/Not Applicable") %>% 
+  arrange(AvatarKey, AgeAtMedStart) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
+
+Medications <- Medications1 %>% 
+  # bind the data with a primary site known as first diagnosis
+  # then the one without which show some No Metastasis
+  bind_rows(., Medications2) %>% 
+  select(AvatarKey, MedPrimaryDiagnosisSiteCode, MedPrimaryDiagnosisSite,
+         MedicationInd, AgeAtMedStart, Medication, AgeAtMedStop) %>% 
+  mutate(across(c("AgeAtMedStart"), ~ case_when(
+    . == "Age 90 or older"                ~ 90,
+    . == "Unknown/Not Applicable"         ~ NA_real_,
+    TRUE                                  ~ as.numeric(.)
+  ))) %>% 
+  distinct(AvatarKey, MedPrimaryDiagnosisSiteCode, .keep_all = TRUE)
+
+Medications <- Medications %>% 
+  arrange(AvatarKey, AgeAtMedStart, Medication, AgeAtMedStop) %>% 
+  group_by(AvatarKey, had_drugs = MedicationInd, AgeAtMedStart,
+           MedPrimaryDiagnosisSiteCode, MedPrimaryDiagnosisSite) %>% 
+  summarise_at(vars(Medication, AgeAtMedStop), str_c, collapse = "; ") %>%
+  ungroup() %>% 
+  mutate(has_medication_data = "Yes")
+```
+
+```{r sct}
+StemCellTransplant1 <- StemCellTransplant %>% 
+  # For the patient with a diagnosis site
+  inner_join(., Diagnosis %>% 
+               select(AvatarKey, PrimaryDiagnosisSiteCode, PrimaryDiagnosisSite), 
+             by = c("AvatarKey", "SCTPrimaryDiagnosisSiteCode" = "PrimaryDiagnosisSiteCode",
+                    "SCTPrimaryDiagnosisSite" = "PrimaryDiagnosisSite")) %>% 
+  arrange(AvatarKey, AgeAtTransplant) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
+
+StemCellTransplant2 <- StemCellTransplant %>% 
+  # For the patients with no diagnosis site
+  filter(SCTPrimaryDiagnosisSite == "Unknown/Not Applicable") %>% 
+  arrange(AvatarKey, AgeAtTransplant) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
+
+StemCellTransplant <- StemCellTransplant1 %>% 
+  # bind the data with a primary site known as first diagnosis
+  # then the one without which show some No Metastasis
+  bind_rows(., StemCellTransplant2) %>% 
+  select(AvatarKey, had_sct = SCTInd, AgeAtTransplant, 
+         TransplantType, TransplantCellSource) %>% 
+  mutate(across(c("AgeAtTransplant"), ~ case_when(
+    . == "Age 90 or older"                ~ 90,
+    . == "Unknown/Not Applicable"         ~ NA_real_,
+    TRUE                                  ~ as.numeric(.)
+  ))) %>% 
+  distinct(AvatarKey, .keep_all = TRUE) %>% 
+  mutate(has_stemcell_data = "Yes")
+```
+
+```{r radiation}
+Radiation <- Radiation %>% 
+  filter(RadiationTherapyInd != "(Migrated) Cannot determine from available documentation")
+
+Radiation1 <- Radiation %>% 
+  # For the patient with a diagnosis site
+  inner_join(., Diagnosis %>% 
+               select(AvatarKey, PrimaryDiagnosisSiteCode, PrimaryDiagnosisSite), 
+             by = c("AvatarKey", "RadPrimaryDiagnosisSiteCode" = "PrimaryDiagnosisSiteCode",
+                    "RadPrimaryDiagnosisSite" = "PrimaryDiagnosisSite")) %>% 
+  arrange(AvatarKey, AgeAtRadiationStart) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
+
+Radiation2 <- Radiation %>% 
+  # For the patients with no diagnosis site
+  filter(RadPrimaryDiagnosisSite == "Unknown/Not Applicable") %>% 
+  arrange(AvatarKey, AgeAtRadiationStart) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
+
+Radiation <- Radiation1 %>% 
+  # bind the data with a primary site known as first diagnosis
+  # then the one without which show some No Metastasis
+  bind_rows(., Radiation2) %>% 
+  select(AvatarKey, RadPrimaryDiagnosisSiteCode, RadPrimaryDiagnosisSite,
+         had_radiation = RadiationTherapyInd, AgeAtRadiationStart) %>% 
+  mutate(across(c("AgeAtRadiationStart"), ~ case_when(
+    . == "Age 90 or older"                ~ 90,
+    . == "Unknown/Not Applicable"         ~ NA_real_,
+    TRUE                                  ~ as.numeric(.)
+  ))) %>% 
+  distinct(AvatarKey, .keep_all = TRUE) %>% 
+  mutate(has_radiation_data = "Yes")
+```
+
+```{r surgery}
+SurgeryBiopsy <- SurgeryBiopsy %>% 
+  filter(SurgeryBiopsyInd != "(Migrated) Cannot determine from available documentation")
+
+SurgeryBiopsy1 <- SurgeryBiopsy %>% 
+  # For the patient with a diagnosis site
+  inner_join(., Diagnosis %>% 
+               select(AvatarKey, PrimaryDiagnosisSiteCode, PrimaryDiagnosisSite), 
+             by = c("AvatarKey", "PrimaryDiagnosisSiteCode" = "PrimaryDiagnosisSiteCode",
+                    "PrimaryDiagnosisSite" = "PrimaryDiagnosisSite")) %>% 
+  arrange(AvatarKey, AgeAtSurgeryBiopsy) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
+
+SurgeryBiopsy2 <- SurgeryBiopsy %>% 
+  # For the patients with no diagnosis site
+  filter(PrimaryDiagnosisSite == "Unknown/Not Applicable") %>% 
+  arrange(AvatarKey, AgeAtSurgeryBiopsy) %>% 
+  distinct(AvatarKey, .keep_all = TRUE)
+
+SurgeryBiopsy <- SurgeryBiopsy1 %>% 
+  # bind the data with a primary site known as first diagnosis
+  # then the one without which show some No Metastasis
+  bind_rows(., SurgeryBiopsy2) %>% 
+  select(AvatarKey, PrimaryDiagnosisSiteCode, PrimaryDiagnosisSite,
+         had_surgery = SiteTherapeutic, AgeAtSurgeryBiopsy) %>% 
+  mutate(across(c("AgeAtSurgeryBiopsy"), ~ case_when(
+    . == "Age 90 or older"                ~ 90,
+    . == "Unknown/Not Applicable"         ~ NA_real_,
+    TRUE                                  ~ as.numeric(.)
+  ))) %>% 
+  distinct(AvatarKey, .keep_all = TRUE) %>% 
+  mutate(has_surgery_data = "Yes")
+```
+
+```{r physical}
+PhysicalAssessment <- PhysicalAssessment %>% 
+  left_join(., Diagnosis %>% 
+               select(AvatarKey, AgeAtDiagnosis), 
+             by = c("AvatarKey")) %>% 
+  mutate(int = abs(AgeAtPhysicalExam - AgeAtDiagnosis)) %>% 
+  arrange(AvatarKey, int) %>% 
+  distinct(AvatarKey, .keep_all = TRUE) %>% 
+  select(AvatarKey, AgeAtPhysicalExam, BodyWeight, BodyHeight, BMI)
+```
+
+```{r tumor markers}
 
 ```
 
 
+# Merge data
+
+# Create new var
+```{r}
+data <- Diagnosis %>% 
+  full_join(., VitalStatus, by = "AvatarKey") %>% 
+  full_join(Outcomes, by = "AvatarKey")
 
 
+data <- data %>% 
+  # OS
+  mutate(os_event = case_when(
+    VitalStatus == "Alive"           ~ 0,
+    TRUE                             ~ 1
+  )) %>% 
+  mutate(os_age = coalesce(AgeAtDeath, AgeAtLastContact)) %>% 
+  mutate(os_time_from_dx_years = os_age - AgeAtDiagnosis) %>% 
+  # PFS
+  mutate(pfs_event = case_when(
+    ProgRecurInd == "No"             ~ 0,
+    ProgRecurInd == "Progression"    ~ 1,
+    ProgRecurInd == "Recurrence"     ~ 1
+  )) %>% 
+  mutate(pfs_age = coalesce(AgeAtProgRecur, AgeAtLastContact)) %>% 
+  mutate(pfs_time_from_dx_years = pfs_age - AgeAtDiagnosis) %>% 
+  # Metastasis
+  mutate(pfs_event = case_when(
+    MetastaticDiseaseInd == "Yes"    ~ 1
+    is.na(MetastaticDiseaseInd)      ~ 0,
+  )) %>% 
+  mutate(met_age = coalesce(AgeAtMetastaticSite, AgeAtLastContact)) %>% 
+  mutate(met_time_from_dx_years = met_age - AgeAtDiagnosis)
+  
 
+```
 
 
 
