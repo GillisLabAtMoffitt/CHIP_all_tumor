@@ -161,7 +161,7 @@ write_csv(cardiot_patients %>% left_join(., mrn, by = "MRN") %>%
 
 
 
-# Vitals
+# Vitals----
 Vitals_v2$AvatarKey[which(duplicated(Vitals_v2$AvatarKey))]
 
 ## PROBLEM : Found patient with 2 age at date, ex: A007107 ##
