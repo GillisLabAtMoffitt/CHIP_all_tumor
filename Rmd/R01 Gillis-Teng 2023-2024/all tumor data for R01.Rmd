@@ -60,21 +60,29 @@ CH_status_lung_BW <-
   read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/lung_list_CHIP_status_Bick&WHO_02.12.2024.txt"))
 CH_status_breast_BW <-
   read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/Breast_list_CHIP_status_Bick&WHO_02.16.2024.txt"))
+CH_status_crc_BW <-
+  read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/colorectal_list_CHIP_status_BickWHO_03.08.2024.txt"))
 
 CH_status_lung_pipeline <-
   read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/lung_list_CHIP_status_pipeline_02.16.2024.txt"))
 CH_status_breast_pipeline <-
   read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/Breast_list_CHIP_status_pipeline_02.16.2024.txt"))
+CH_status_crc_pipeline <-
+  read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/colorectal_list_CHIP_status_pipeline_03.08.2024.txt"))
 
 CH_status_BW <- bind_rows(CH_status_lung_BW %>% 
                          mutate(cancer_type = "Lung"),
                        CH_status_breast_BW %>% 
-                         mutate(cancer_type = "Breast")) %>% 
+                         mutate(cancer_type = "Breast"),
+                       CH_status_crc_BW %>% 
+                         mutate(cancer_type = "Colorectal")) %>% 
   rename(CH_status_using_BickWHO = CHIP)
 CH_status_pipeline <- bind_rows(CH_status_lung_pipeline %>% 
                          mutate(cancer_type = "Lung"),
                        CH_status_breast_pipeline %>% 
-                         mutate(cancer_type = "Breast")) %>% 
+                         mutate(cancer_type = "Breast"),
+                       CH_status_crc_pipeline %>% 
+                         mutate(cancer_type = "Colorectal")) %>% 
   rename(CH_status_using_pipeline = CHIP)
 CH_status <- full_join(CH_status_BW, 
                        CH_status_pipeline,
@@ -83,10 +91,14 @@ CH_status <- full_join(CH_status_BW,
 
 # breast_samples <- 
 #   read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/Breast_sample_list.txt"))
-colorectal_samples <- 
-  read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/Colorectal_sample_list.txt"))
+# colorectal_samples <- 
+#   read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/Colorectal_sample_list.txt"))
 mm_samples <- 
   read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/MM_sample_list.txt"))
+
+MSI_marker <-
+  readxl::read_xlsx(paste0(here::here(), 
+                           "/Rmd/R01 Gillis-Teng 2023-2024/MSI_23PRJ127MCC_20230620.xlsx"))
 ```
 
 Diagnosis :
@@ -94,7 +106,7 @@ Diagnosis :
 
 ```{r CH status}
 CH_status <- CH_status %>%
-  bind_rows(., colorectal_samples, mm_samples) %>%
+  bind_rows(., mm_samples) %>%
   rename(AvatarKey = ORIENAvatarKey) %>%
   mutate_at(c("CH_status_using_BickWHO", "CH_status_using_pipeline"), ~ case_when(
     . == "TRUE"           ~ "CH",
@@ -196,7 +208,8 @@ Diagnosis <- Diagnosis %>%
          PrimaryDiagnosisSiteCode : Histology,
          ClinGroupStage,
          CurrentlySeenForPrimaryOrRecurr,
-         PerformStatusAtDiagnosis) %>%
+         PerformStatusAtDiagnosis, 
+         OtherStagingSystem, OtherStagingValue) %>%
   mutate(across(c("AgeAtDiagnosis"), ~ case_when(
     . == "Age 90 or older"                ~ 90,
     . == "Unknown/Not Applicable"         ~ NA_real_,
@@ -204,13 +217,16 @@ Diagnosis <- Diagnosis %>%
   ))) %>%
   mutate(ECOG = str_match(PerformStatusAtDiagnosis, "ECOG ([:digit:])")[,2]) %>%
   mutate(Karnofsky = str_match(PerformStatusAtDiagnosis, "Karnofsky ([:digit:].*)%")[,2]) %>%
+  mutate(iss_stage = case_when(
+    OtherStagingSystem == "ISS"           ~ OtherStagingValue
+  )) %>% 
   arrange(AvatarKey, AgeAtDiagnosis) %>%
   group_by(AvatarKey) %>%
   mutate(diagnosis_sequence = row_number(AvatarKey), .after = AvatarKey) %>%
   mutate(has_subsequent_cancer = case_when(
-    diagnosis_sequence > 1           ~ "Yes"
+    diagnosis_sequence > 1                ~ "Yes"
   )) %>%
-  fill(has_subsequent_cancer, .direction = "updown") %>%
+  fill(has_subsequent_cancer, iss_stage, .direction = "updown") %>%
   ungroup()
 
 subsequent_diagnosis <- Diagnosis %>%
@@ -508,6 +524,93 @@ PhysicalAssessment <- PhysicalAssessment %>%
   mutate(bmi_cat = factor(bmi_cat, levels = c("Underweight", "Healthy", "Overweight", "Obese")))
 ```
 
+```{r iss_staging}
+serum_albumin <- Labs %>%
+  filter(LabTest == "Albumin (Serum)") %>% 
+  mutate(across(c("AgeAtLabResults"), ~ case_when(
+    . == "Age 90 or older"                ~ 90,
+    . == "Unknown/Not Applicable"         ~ NA_real_,
+    TRUE                                  ~ as.numeric(.)
+  ))) %>%
+  mutate(across(where(is.character), ~ na_if(., "Unknown/Not Applicable"))) %>%
+  left_join(., Diagnosis %>%
+               select(AvatarKey, AgeAtDiagnosis),
+             by = c("AvatarKey")) %>%
+  mutate(int = abs(AgeAtLabResults - AgeAtDiagnosis)) %>%
+  arrange(AvatarKey, int) %>%
+  distinct(AvatarKey, .keep_all = TRUE) %>% 
+  mutate(LabResults = as.numeric(LabResults)) %>% 
+  select(AvatarKey,
+         albumin_value = LabResults, 
+         albumin_unit = LabUnits)
+
+iss_b2 <- TumorMarker %>%
+  mutate(across(c("AgeAtTumorMarkerTest"), ~ case_when(
+    . == "Age 90 or older"                ~ 90,
+    . == "Unknown/Not Applicable"         ~ NA_real_,
+    TRUE                                  ~ as.numeric(.)
+  ))) %>%
+  mutate(across(where(is.character), ~ na_if(., "Unknown/Not Applicable"))) %>%
+  filter(TMarkerTest == "Beta-2-microglobulin (B2M) level") %>% 
+  select(AvatarKey, AgeAtTumorMarkerTest, 
+         TMarkerTest, TMarkerResultValue, TMarkerValueUOM)
+
+iss_b2_ <- Labs %>%
+  mutate(across(c("AgeAtLabResults"), ~ case_when(
+    . == "Age 90 or older"                ~ 90,
+    . == "Unknown/Not Applicable"         ~ NA_real_,
+    TRUE                                  ~ as.numeric(.)
+  ))) %>%
+  mutate(across(where(is.character), ~ na_if(., "Unknown/Not Applicable"))) %>%
+  filter(LabTest == "Beta 2 Microglobulin") %>% 
+  select(AvatarKey, AgeAtTumorMarkerTest = AgeAtLabResults, 
+         TMarkerTest = LabTest, 
+         TMarkerResultValue = LabResults, 
+         TMarkerValueUOM = LabUnits)
+
+b2_globulin <- bind_rows(iss_b2, iss_b2_) %>% 
+  arrange(AvatarKey, AgeAtTumorMarkerTest) %>% 
+  left_join(., Diagnosis %>%
+               select(AvatarKey, AgeAtDiagnosis),
+             by = c("AvatarKey")) %>%
+  mutate(int = abs(AgeAtTumorMarkerTest - AgeAtDiagnosis)) %>%
+  arrange(AvatarKey, int) %>%
+  distinct(AvatarKey, .keep_all = TRUE) %>% 
+  select(AvatarKey,
+         b2_value = TMarkerResultValue, 
+         b2_unit = TMarkerValueUOM) %>% 
+  mutate(b2_value = as.numeric(b2_value)) %>% 
+  mutate(b2_value = case_when(
+    b2_unit == "mg/L"                     ~ b2_value,
+    b2_unit == "mg/dL"                    ~ b2_value * 10,
+    b2_unit == "ng/mL"                    ~ b2_value / 1000,
+    b2_unit == "ug/mL (mcg/mL)"           ~ b2_value,
+    b2_unit == "Unknown"                  ~ NA_real_
+  )) %>% 
+  mutate(b2_unit = "mg/L")
+
+iss_stage_calculated <- 
+  full_join(serum_albumin, b2_globulin, by = "AvatarKey") %>% 
+  mutate(iss_stage_calculated = case_when(
+    b2_value < 3.5 &
+      albumin_value >= 3.5                ~ "I",
+    b2_value < 3.5 &
+      albumin_value < 3.5                 ~ "II",
+    b2_value > 3.5 &
+      b2_value <= 5.5                     ~ "II",
+    b2_value > 5.5                        ~ "III"
+  )) %>% 
+  filter(!is.na(iss_stage_calculated))
+
+Diagnosis <- Diagnosis %>% 
+  left_join(., iss_stage_calculated, 
+            by = "AvatarKey") %>% 
+  mutate(iss_stage = coalesce(iss_stage, iss_stage_calculated))
+
+rm(serum_albumin, iss_b2, iss_b2_, iss_stage_calculated)
+```
+
+
 ```{r tumor markers}
 TumorMarker <- TumorMarker %>%
   mutate(across(c("AgeAtTumorMarkerTest"), ~ case_when(
@@ -588,6 +691,15 @@ TumorMarker <- TumorMarker %>%
   pivot_wider(id_cols = AvatarKey,
               names_from = marker_test,
               values_from = marker_interpretation)
+
+
+# MSI ----
+MSI_marker <- MSI_marker %>% 
+  mutate(MSI_high_score = case_when(
+    `MSIsensor2 Score` >= 20       ~ "Yes",
+    `MSIsensor2 Score` < 20        ~ "No"
+  )) %>% 
+  select(ORIENAvatarKey, `WES SLID`, MSI_high_score)
 ```
 
 ```{r family history}
@@ -626,10 +738,13 @@ TumorSequencing <- TumorSequencing %>%
 Tumor_wes <-
   ClinicalMolLinkage %>%
   filter(Tumor.Germline == "Tumor") %>%
+  left_join(., MSI_marker,
+            by = c("ORIENAvatarKey", "WES" = "WES SLID")) %>% 
   select(ORIENAvatarKey, Tumor_WES = WES,
          tumor_collection_age = Age.At.Specimen.Collection,
          Disease.Type,
-         tumor_SpecimenSiteOfCollection = SpecimenSiteOfCollection)
+         tumor_SpecimenSiteOfCollection = SpecimenSiteOfCollection,
+         MSI_high_score)
 Germline_wes <-
   ClinicalMolLinkage %>%
   filter(Tumor.Germline == "Germline") %>%
@@ -693,8 +808,8 @@ rm(demographics, VitalStatus, Diagnosis,
 ```
 
 ```{r load rds}
-# write_rds(data, "Rmd/R01 Gillis-Teng 2023-2024/cleaned_all_tumor_type_data_02262024.rds")
-data <- read_rds(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/cleaned_all_tumor_type_data_02262024.rds"))
+# write_rds(data, "Rmd/R01 Gillis-Teng 2023-2024/cleaned_all_tumor_type_data_04012024.rds")
+data <- read_rds(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/cleaned_all_tumor_type_data_04012024.rds"))
 ```
 
 
@@ -814,7 +929,7 @@ var_label(data) <- list(AgeAtDiagnosis = "Patient age at diagnosis?", germline_c
 ```{r}
 data <- data %>% 
   filter(!is.na(CH_status_using_BickWHO)) %>% 
-  mutate(CH_status = factor(CH_status, levels = c("No CH", "CH")))
+  mutate(CH_status_using_BickWHO = factor(CH_status_using_BickWHO, levels = c("No CH", "CH")))
 ```
 
 ## I. Lung
@@ -1088,9 +1203,32 @@ breast_data <- data %>%
 ```
 
 ## III. Colorectal to come
+```{r}
+crc_data <- data %>% 
+  filter(Disease.Type == "GI - Colorectal Cancer") %>% 
+  mutate(ClinGroupStage = case_when(
+    str_detect(ClinGroupStage, "0")        ~ "0",
+    str_detect(ClinGroupStage, "IV")       ~ "IV",
+    str_detect(ClinGroupStage, "III")      ~ "III",
+    str_detect(ClinGroupStage, "II")       ~ "II",
+    str_detect(ClinGroupStage, "I")        ~ "I"
+  ), ClinGroupStage = factor(ClinGroupStage, 
+                             levels = c("0", "I", "II", 
+                                        "III", "IV")))
+```
 
 ## IV. Multiple Myeloma to come
-
+```{r}
+mm_data <- data %>% 
+  filter(Disease.Type == "HEM - Myeloma Spectrum") %>% 
+  mutate(iss_stage = case_when(
+    str_detect(iss_stage, "III")      ~ "III",
+    str_detect(iss_stage, "II")       ~ "II",
+    str_detect(iss_stage, "I")        ~ "I"
+  ), iss_stage = factor(iss_stage, 
+                             levels = c("I", "II", 
+                                        "III")))
+```
 
 
 
