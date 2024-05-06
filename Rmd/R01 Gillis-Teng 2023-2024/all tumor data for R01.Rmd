@@ -57,38 +57,57 @@ path <- fs::path("", "Volumes", "Lab_Gillis","ORIEN_Avatar", "resources")
 load("~/Documents/GitHub/Gillis/CHIP_all_tumor/Rmd/R01 Gillis-Teng 2023-2024/initial_files.RData")
 
 CH_status_lung_BW <-
-  read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/lung_list_CHIP_status_Bick&WHO_02.12.2024.txt"))
+  read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/lung_list_CHIP_status_BickWHO_output_withTumorVAF.05.02.2024.txt"))
 CH_status_breast_BW <-
-  read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/Breast_list_CHIP_status_Bick&WHO_02.16.2024.txt"))
+  read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/breast_list_CHIP_status_BickWHO_output_withTumorVAF.04.30.2024.txt"))
 CH_status_crc_BW <-
-  read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/colorectal_list_CHIP_status_BickWHO_03.08.2024.txt"))
+  read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/colorectal_list_CHIP_status_BickWHO_output_withTumorVAF.04.29.2024.txt"))
 
-CH_status_lung_pipeline <-
-  read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/lung_list_CHIP_status_pipeline_02.16.2024.txt"))
-CH_status_breast_pipeline <-
-  read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/Breast_list_CHIP_status_pipeline_02.16.2024.txt"))
-CH_status_crc_pipeline <-
-  read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/colorectal_list_CHIP_status_pipeline_03.08.2024.txt"))
+# CH_status_lung_pipeline <-
+#   read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/lung_list_CHIP_status_pipeline_02.16.2024.txt"))
+# CH_status_breast_pipeline <-
+#   read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/Breast_list_CHIP_status_pipeline_02.16.2024.txt"))
+# CH_status_crc_pipeline <-
+#   read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/colorectal_list_CHIP_status_pipeline_output.04.22.2024.txt"))
 
 CH_status_BW <- bind_rows(CH_status_lung_BW %>% 
-                         mutate(cancer_type = "Lung"),
-                       CH_status_breast_BW %>% 
-                         mutate(cancer_type = "Breast"),
-                       CH_status_crc_BW %>% 
-                         mutate(cancer_type = "Colorectal")) %>% 
-  rename(CH_status_using_BickWHO = CHIP)
-CH_status_pipeline <- bind_rows(CH_status_lung_pipeline %>% 
-                         mutate(cancer_type = "Lung"),
-                       CH_status_breast_pipeline %>% 
-                         mutate(cancer_type = "Breast"),
-                       CH_status_crc_pipeline %>% 
-                         mutate(cancer_type = "Colorectal")) %>% 
-  rename(CH_status_using_pipeline = CHIP)
-CH_status <- full_join(CH_status_BW, 
-                       CH_status_pipeline,
-                       by = c("ORIENAvatarKey", "Germline_WES", 
-                              "Tumor_WES", "cancer_type"))
-
+                            mutate(cancer_type = "Lung"), # %>% 
+                            # mutate_at(c("CHIP"), ~ case_when(
+                            #   . == "TRUE"           ~ "CH",
+                            #   . == "FALSE"           ~ "No CH"
+                            # )) %>%
+                            # rename(CH_status_using_BickWHO = CHIP),
+                          CH_status_breast_BW %>% 
+                            mutate(cancer_type = "Breast"), # %>%
+                            # rename(Germline_WES = Germline,
+                            #        CH_status_using_BickWHO = CH_or_not),
+                          CH_status_crc_BW %>% 
+                            mutate(cancer_type = "Colorectal")) %>% 
+                            # mutate_at(c("CH_or_not"), ~ case_when(
+                            #   . == "CH"           ~ "CH",
+                            #   . == "NO"           ~ "No CH"
+                            # )) %>%
+                            # rename(Germline_WES = Germline,
+                            #        CH_status_using_BickWHO = CH_or_not)
+                          # ) %>% 
+                            mutate_at(c("CH_or_not"), ~ case_when(
+                              . == "CH"           ~ "CH",
+                              . == "NO"           ~ "No CH"
+                            )) %>% 
+                            rename(Germline_WES = Germline,
+                                   CH_status_using_BickWHO = CH_or_not)
+# CH_status_pipeline <- bind_rows(CH_status_lung_pipeline %>% 
+#                          mutate(cancer_type = "Lung"),
+#                        CH_status_breast_pipeline %>% 
+#                          mutate(cancer_type = "Breast"),
+#                        CH_status_crc_pipeline %>% 
+#                          mutate(cancer_type = "Colorectal")) %>% 
+#   rename(CH_status_using_pipeline = CHIP)
+# CH_status <- full_join(CH_status_BW, 
+#                        CH_status_pipeline,
+#                        by = c("ORIENAvatarKey", "Germline_WES", 
+#                               "Tumor_WES", "cancer_type"))
+CH_status <- CH_status_BW
 # breast_samples <- 
 #   read.delim(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/Breast_sample_list.txt"))
 # colorectal_samples <- 
@@ -108,17 +127,19 @@ Diagnosis :
 CH_status <- CH_status %>%
   bind_rows(., mm_samples) %>%
   rename(AvatarKey = ORIENAvatarKey) %>%
-  mutate_at(c("CH_status_using_BickWHO", "CH_status_using_pipeline"), ~ case_when(
-    . == "TRUE"           ~ "CH",
-    . == "FALSE"          ~ "No CH",
-    is.na(.)              ~ "No data"
-  )) %>% 
-  mutate_at(c("CH_status_using_BickWHO", "CH_status_using_pipeline"), ~ factor(
-    ., levels = c("No CH", "CH", "No data"))) %>%
+  # mutate_at(c("CH_status_using_BickWHO", "CH_status_using_pipeline"), ~ case_when(
+  #   . == "TRUE"           ~ "CH",
+  #   . == "FALSE"          ~ "No CH",
+  #   is.na(.)              ~ "No data"
+  # )) %>% 
+  mutate_at(c("CH_status_using_BickWHO"#, "CH_status_using_pipeline"
+              ), ~ factor(
+    ., levels = c("No CH", "CH"#, "No data"
+                  ))) #%>%
   # select(-CHIP) %>%
-  distinct(AvatarKey, CH_status_using_BickWHO, .keep_all = TRUE) %>% 
-  arrange(AvatarKey, desc(CH_status_using_BickWHO)) %>% 
-  distinct(AvatarKey, cancer_type, .keep_all = TRUE)
+  # distinct(AvatarKey, CH_status_using_BickWHO, .keep_all = TRUE) %>% 
+  # arrange(AvatarKey, desc(CH_status_using_BickWHO)) %>% 
+  # distinct(AvatarKey, cancer_type, .keep_all = TRUE)
 
 (which(duplicated(CH_status$AvatarKey)))
 ```
@@ -808,8 +829,8 @@ rm(demographics, VitalStatus, Diagnosis,
 ```
 
 ```{r load rds}
-# write_rds(data, "Rmd/R01 Gillis-Teng 2023-2024/cleaned_all_tumor_type_data_04012024.rds")
-data <- read_rds(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/cleaned_all_tumor_type_data_04012024.rds"))
+write_rds(data, "Rmd/R01 Gillis-Teng 2023-2024/cleaned_all_tumor_type_data_05062024.rds")
+data <- read_rds(paste0(here::here(), "/Rmd/R01 Gillis-Teng 2023-2024/cleaned_all_tumor_type_data_05062024.rds"))
 ```
 
 
@@ -1187,9 +1208,10 @@ tbl2 <- coxph(Surv(time = lung_data$pfs_time_from_treatment_years,
 tbl_merge(list(tbl1, tbl2), tab_spanner = c("**Univariable**", "**Multivariable**"))
 ```
 
-## II. Breast to come
+## II. Breast
 ```{r}
 breast_data <- data %>% 
+  arrange(AvatarKey) %>% 
   filter(Disease.Type == "BRE - Breast Cancer") %>% 
   mutate(ClinGroupStage = case_when(
     str_detect(ClinGroupStage, "0")        ~ "0",
@@ -1202,9 +1224,10 @@ breast_data <- data %>%
                                         "III", "IV")))
 ```
 
-## III. Colorectal to come
+## III. Colorectal
 ```{r}
 crc_data <- data %>% 
+  arrange(AvatarKey) %>% 
   filter(Disease.Type == "GI - Colorectal Cancer") %>% 
   mutate(ClinGroupStage = case_when(
     str_detect(ClinGroupStage, "0")        ~ "0",
@@ -1217,7 +1240,7 @@ crc_data <- data %>%
                                         "III", "IV")))
 ```
 
-## IV. Multiple Myeloma to come
+## IV. Multiple Myeloma
 ```{r}
 mm_data <- data %>% 
   filter(Disease.Type == "HEM - Myeloma Spectrum") %>% 
